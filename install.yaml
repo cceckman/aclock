@@ -1,0 +1,24 @@
+---
+- name: "Install clock software"
+  hosts: rack12
+  vars:
+    working: /opt/clock
+    matrix_src_hash: a3eea997a9254b83ab2de97ae80d83588f696387
+  tasks:
+    - name: "Install python"
+      become: true
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+        pkg:
+          - python3
+    - name: "Prepare working directory"
+      become: true
+      ansible.builtin.file:
+        path: "{{ working }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+    - name: "Install RGB matrix software"
+      ansible.builtin.import_tasks:
+        file: tasks/install-matrix.yaml
+

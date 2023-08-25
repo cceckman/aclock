@@ -13,7 +13,7 @@ LEDs around the edge to indicate the daylight/nighttime hours.
 
 ## Active hardware
 
-- Raspberry Pi 3 (B? +?)
+- Raspberry Pi of some flavor
 - 1 meter of RGBW LED strip with individually-addressible LEDs (NeoPixel).
 
   [Product page](http://www.adafruit.com/product/2846),
@@ -67,24 +67,23 @@ Playing around with some dimensions - ignoring print width:
 ## Software
 
 Given that the libraries seem to be available in Python, it may be easiest to
-start there.let's just run it
-there.
+start there.
 
 [Matrix driver library](https://github.com/hzeller/rpi-rgb-led-matrix)
-for running the clock face
+for running the clock face. It's actually C++, with Python bindings- so will
+require "manual" install. There's a [reference install
+script](https://raw.githubusercontent.com/adafruit/Raspberry-Pi-Installer-Scripts/main/rgb-matrix.sh) but- it's interactive, so, no.
 
 [Astral](https://astral.readthedocs.io/en/latest/) for computing rise/set times
 
 [Adafruit-Blinka](https://pypi.org/project/Adafruit-Blinka/)
 provides a
 compatibility layer, adding CircuitPython to regular Python (per
-[their guide](https://learn.adafruit.com/circuitpython-on-raspberrypi-linux)).
+[their guide](https://learn.adafruit.com/circuitpython-on-raspberrypi-linux))
+for the Neopixel library.
 
 The [Neopixel
 guide](https://learn.adafruit.com/neopixels-on-raspberry-pi/python-usage) points
 to `rpi_ws281x` and `adafruit-circuitpython-neopixel` from PIP as the other
 sources.
 
-Since I'm standardizing the homelab on NixOS, I'll also want to look at
-the [Python Nix guide](https://nixos.wiki/wiki/Python) when putting the code
-together.
