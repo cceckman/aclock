@@ -28,7 +28,7 @@ def color_of(brmin, brmax, hour, minute, second):
 
     Converts a hue value in degrees (minute, second) to an RGB tuple.
     """
-    angle = minute * 60 + second
+    angle = minute * 6 + (second / 10)
 
     def _f(n, h, s, l):
       k = (n + h / 30) % 12
