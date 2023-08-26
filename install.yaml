@@ -12,6 +12,18 @@
         cache_valid_time: 3600
         pkg:
           - python3
+    - name: "Force isolation"
+      become: true
+      ansible.builtin.lineinfile:
+        path: /boot/cmdline.txt
+        backrefs: true
+        regexp: '^(isolcpus=3 )?(.*)$'
+        line: 'isolcpus=3 \2'
+      register: cpu_isolated
+    - name: "Reboot"
+      become: true
+      when: "cpu_isolated.changed"
+      ansible.builtin.reboot: {}
     - name: "Prepare working directory"
       become: true
       ansible.builtin.file:
