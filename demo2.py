@@ -15,7 +15,7 @@ def get_matrix():
     options.parallel = 1
     # TODO: strap PWM pins for smooth running
     options.hardware_mapping = 'adafruit-hat'
-    options.show_refresh_rate = 1
+    # options.show_refresh_rate = 1
 
     return RGBMatrix(options = options)
 
@@ -71,7 +71,7 @@ class Walker:
 
         color = color_of(0.1, 0.5, hour, minute, now.tm_sec)
 
-        text = "{:2d}:{:2d}".format(hour, minute)
+        text = "{:02d}:{:02d}".format(hour, minute)
         canvas.SetPixel(0, 0, color.red, color.green, color.blue)
         # Start at Y offset equal to font height, otherwise it draws offscreen.
         # The fonts appear to include a +1 spacer in the height?
