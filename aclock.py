@@ -58,7 +58,7 @@ class Walker:
         self._matrix = matrix
         self._canvas = self._matrix.CreateFrameCanvas()
         self._font = graphics.Font()
-        self._font.LoadFont("matrix/src/fonts/6x13.bdf")
+        self._font.LoadFont("matrix/src/fonts/5x8.bdf")
 
     def _render(self):
         canvas = self._canvas
@@ -72,26 +72,15 @@ class Walker:
         color = color_of(0.1, 0.5, hour, minute, now.tm_sec)
 
         text = "{:02d}:{:02d}".format(hour, minute)
-        canvas.SetPixel(0, 0, color.red, color.green, color.blue)
         # Start at Y offset equal to font height, otherwise it draws offscreen.
-        # The fonts appear to include a +1 spacer in the height?
-        # We use that for our heartbeat.
-        graphics.DrawText(canvas, self._font, 2, self._font.height, color, text)
+        # Many-to-all have 1-2 pixels of clearance at the top...
+        # It looks like the baseline / height are kinda messed up in these
+        # fonts; _all_ characters bump into the baseline, not just descenders.
+        # So... time to use one not from Zeller's set?
+        # https://leahneukirchen.org/fonts/
+        graphics.DrawText(canvas, self._font, 2, self._font.baseline, color, text)
 
         self._canvas = self._matrix.SwapOnVSync(canvas)
-
-    def _update_pulse(self):
-      # Update pulse variable:
-      pulse = self._pulse
-      if pulse % 2 == 0:
-          pulse += 2
-      else:
-          pulse -= 2
-      if pulse > 127:
-          pulse -= 1
-      if pulse < 0:
-          pulse += 1
-      self._pulse = pulse
 
     def run(self):
         while True:

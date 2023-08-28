@@ -1,6 +1,7 @@
 ---
 - name: "Install clock software"
   hosts: rack12
+  gather_facts: false
   vars:
     working: /opt/aclock
     matrix_src_hash: a3eea997a9254b83ab2de97ae80d83588f696387
