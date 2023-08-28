@@ -58,7 +58,10 @@ class Walker:
         self._matrix = matrix
         self._canvas = self._matrix.CreateFrameCanvas()
         self._font = graphics.Font()
-        self._font.LoadFont("matrix/src/fonts/5x8.bdf")
+        self._font.LoadFont("5x13.bdf")
+        # The observed dimensions of the numbers of this font:
+        self._font_width = 5
+        self._font_height = 9
 
     def _render(self):
         canvas = self._canvas
@@ -73,12 +76,16 @@ class Walker:
 
         text = "{:02d}:{:02d}".format(hour, minute)
         # Start at Y offset equal to font height, otherwise it draws offscreen.
-        # Many-to-all have 1-2 pixels of clearance at the top...
-        # It looks like the baseline / height are kinda messed up in these
-        # fonts; _all_ characters bump into the baseline, not just descenders.
-        # So... time to use one not from Zeller's set?
-        # https://leahneukirchen.org/fonts/
-        graphics.DrawText(canvas, self._font, 2, self._font.baseline, color, text)
+        #
+        # The fonts provided with rgbmatrix have an odd baseline- always 1px,
+        # with descenders hitting the same height as the bottom of other
+        # characters.
+        # Trying out options from https://leahneukirchen.org/fonts/ instead.
+        textwidth = len(text) * self._font_width
+        # Empty column is on the RHS of the character, so we round the LH margin up
+        h_margin = math.ceil((canvas.width - textwidth) / 2)
+
+        graphics.DrawText(canvas, self._font, h_margin, self._font_height + 1, color, text)
 
         self._canvas = self._matrix.SwapOnVSync(canvas)
 

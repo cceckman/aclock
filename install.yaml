@@ -19,6 +19,7 @@
         - aclock.py
         - run-aclock.sh
         - requirements.txt
+        - 5x13.bdf
       ansible.builtin.copy:
         src: "{{ item }}"
         mode: '0555'
