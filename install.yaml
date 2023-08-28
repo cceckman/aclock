@@ -2,35 +2,42 @@
 - name: "Install clock software"
   hosts: rack12
   vars:
-    working: /opt/clock
+    working: /opt/aclock
     matrix_src_hash: a3eea997a9254b83ab2de97ae80d83588f696387
   tasks:
-    - name: "Install python"
-      become: true
-      ansible.builtin.apt:
-        update_cache: true
-        cache_valid_time: 3600
-        pkg:
-          - python3
-    - name: "Force isolation"
-      become: true
-      ansible.builtin.lineinfile:
-        path: /boot/cmdline.txt
-        backrefs: true
-        regexp: '^(isolcpus=3 )?(.*)$'
-        line: 'isolcpus=3 \2'
-      register: cpu_isolated
-    - name: "Reboot"
-      become: true
-      when: "cpu_isolated.changed"
-      ansible.builtin.reboot: {}
-    - name: "Prepare working directory"
-      become: true
-      ansible.builtin.file:
-        path: "{{ working }}"
-        state: directory
-        owner: "{{ ansible_user }}"
+    - name: "Prepare system"
+      when: "quick is undefined"
+      ansible.builtin.import_tasks:
+        file: tasks/sysprep.yaml
     - name: "Install RGB matrix software"
+      when: "quick is undefined"
       ansible.builtin.import_tasks:
         file: tasks/install-matrix.yaml
+    - name: "Copy opt contents"
+      with_items:
+        - aclock.py
+        - run-aclock.sh
+        - requirements.txt
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        mode: '0555'
+        dest: "{{ working }}/{{ item }}"
+    - name: "Install Python dependencies"
+      when: "quick is undefined"
+      ansible.builtin.shell:
+        chdir: "{{ working }}"
+        cmd: 'python3 -m venv env && . env/bin/activate && python3 -m pip install -r requirements.txt'
+    - name: "Install aclock unit"
+      become: true
+      ansible.builtin.copy:
+        src: "aclock.service"
+        dest: /etc/systemd/system/aclock.service
+    - name: "Start/restart clock"
+      become: true
+      ansible.builtin.systemd:
+        daemon_reload: true
+        unit: aclock.service
+        enabled: true
+        state: restarted
+
 

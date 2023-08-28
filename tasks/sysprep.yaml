@@ -1,0 +1,28 @@
+# System preparation tasks
+- name: "Install python tools"
+  become: true
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+    pkg:
+      - python3
+      - python3-venv
+- name: "Force isolation"
+  become: true
+  ansible.builtin.lineinfile:
+    path: /boot/cmdline.txt
+    backrefs: true
+    regexp: '^(isolcpus=3 )?(.*)$'
+    line: 'isolcpus=3 \2'
+  register: cpu_isolated
+- name: "Reboot"
+  become: true
+  when: "cpu_isolated.changed"
+  ansible.builtin.reboot: {}
+- name: "Prepare working directory"
+  become: true
+  ansible.builtin.file:
+    path: "{{ working }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+

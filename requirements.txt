@@ -1,4 +1,4 @@
 Adafruit-Blinka==8.20.1
 adafruit-circuitpython-neopixel==6.3.9
 rpi-ws281x==5.0.0
-
+astral==3.2

@@ -58,7 +58,7 @@ class Walker:
         self._matrix = matrix
         self._canvas = self._matrix.CreateFrameCanvas()
         self._font = graphics.Font()
-        self._font.LoadFont("/opt/clock/matrix/src/fonts/6x13.bdf")
+        self._font.LoadFont("matrix/src/fonts/6x13.bdf")
 
     def _render(self):
         canvas = self._canvas

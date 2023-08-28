@@ -1,0 +1,23 @@
+[Unit]
+Name=Clock
+Description=A clock with some fancy doodads.
+Website=https://github.com/cceckman/aclock
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+ExecStart=/opt/aclock/run-aclock.sh
+
+WorkingDirectory=/opt/aclock/
+
+# Risky: access /dev/mem, presumably for direct-programming of GPIO pins.
+# In theory the `libgpiod` interface should be fast enough:
+# https://www.thegoodpenguin.co.uk/blog/stop-using-sys-class-gpio-its-deprecated/
+# but maybe not; I'd need to rewrite the driver to see.
+#
+# That's a later problem! For now, don't run anything else (or anything
+# sensistive) on this node.
+User=root
+Group=root
+
