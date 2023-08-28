@@ -46,7 +46,7 @@ def color_of(brmin, brmax, hour, minute, second):
     brangle = (hour / 24.0) * 2.0 * math.pi
     # Minimum at 0, maximum at noon- that's -cos.
     # Scale into (0, 1).
-    brscale = (1 + math.cos(brangle)) / 2
+    brscale = (1 - math.cos(brangle)) / 2
     # Scale further, from brmin to brmax.
     # Scale down so we're dealing with "luminant" colors, not washed-out-
     # that is, limit to the value regime.
