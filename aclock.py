@@ -13,7 +13,10 @@ def get_matrix():
     options.cols = 32
     options.chain_length = 1
     options.parallel = 1
-    # TODO: strap PWM pins for smooth running
+    # Note: The guide in
+    # https://learn.adafruit.com/neopixels-on-raspberry-pi/raspberry-pi-wiring
+    # uses the PWM and DMA features to drive _neopixels_ - which means we can't
+    # use PWM to improve the quality of this display. Drat!
     options.hardware_mapping = 'adafruit-hat'
     # options.show_refresh_rate = 1
 
