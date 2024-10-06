@@ -28,7 +28,15 @@ then
  echo 'dtparam=spi=on' | sudo tee -a "$TARGET/config.txt"
 fi
 
+if ! grep -q 'enable_uart=1' "$TARGET/config.txt"
+then
+ echo 'enable_uart=1' | sudo tee -a "$TARGET/config.txt"
+fi
+
+sudo -n sed -i "s/console=tty1//" "$TARGET/cmdline.txt"
+
 cat wpa_supplicant.conf | sudo tee "$TARGET"/wpa_supplicant.conf >/dev/null
+cat userconf.txt | sudo tee "$TARGET"/userconf.txt >/dev/null
 sudo touch "$TARGET"/ssh
 
 sudo umount "$TARGET"
