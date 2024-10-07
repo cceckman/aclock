@@ -1,0 +1,6 @@
+*.xz
+*.img
+wpa_supplicant.conf
+userconf.txt
+mount/
+
