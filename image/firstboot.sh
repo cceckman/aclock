@@ -13,12 +13,11 @@ su cceckman -c "touch ~/.ssh/authorized_keys"
 su cceckman -c "chmod 0755 ~/.ssh/authorized_keys"
 su cceckman -c "echo 'sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIFhsrsc3V3KcH79keRp/jL38ty/BHh5897avu2hMvthJAAAABHNzaDo= cceckman@cromwell' >~/.ssh/authorized_keys"
 
+# Set up WiFi before having anything to do with apt
+/opt/firstboot-wifi.sh
+
 # Recommended in
 # https://github.com/hzeller/rpi-rgb-led-matrix/tree/master?tab=readme-ov-file#use-minimal-raspbian-distribution
 apt-get remove -y bluez bluez-firmware pi-bluetooth triggerhappy pigpio
-
-apt-get install -y vim
-
-/opt/firstboot-wifi.sh
 
 systemctl disable cce-firstboot
