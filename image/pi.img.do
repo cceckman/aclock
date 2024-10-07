@@ -26,7 +26,7 @@ redo-ifchange wpa_supplicant.conf userconf.txt firstboot.sh cce-firstboot.servic
 
 sudo -n cp userconf.txt mount/boot/firmware/userconf.txt
 echo >&2 "Updating config.txt:"
-diff >&2 mount/boot/firmware/config.txt config.txt 
+diff >&2 mount/boot/firmware/config.txt config.txt || true
 sudo -n cp config.txt mount/boot/firmware/config.txt
 
 # For better LED matrix performance:
