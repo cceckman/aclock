@@ -3,4 +3,4 @@
 wpa_supplicant.conf
 userconf.txt
 mount/
-
+firstboot-wifi.sh

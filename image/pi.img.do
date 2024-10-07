@@ -22,12 +22,13 @@ LODEV="$(sudo -n losetup --show -P -f "$3")"
 sudo -n mount -o loop "$LODEV"p2 mount/
 sudo -n mount -o loop "$LODEV"p1 mount/boot/
 
-redo-ifchange wpa_supplicant.conf userconf.txt firstboot.sh cce-firstboot.service config.txt
+redo-ifchange userconf.txt firstboot.sh firstboot-wifi.sh cce-firstboot.service config.txt
 
 sudo -n cp userconf.txt mount/boot/userconf.txt
 echo >&2 "Updating config.txt:"
 diff >&2 mount/boot/config.txt config.txt || true
 sudo -n cp config.txt mount/boot/config.txt
+sudo -n touch mount/boot/ssh
 
 # For better LED matrix performance:
 # https://access.redhat.com/solutions/480473
@@ -36,10 +37,9 @@ echo -n " isolcpus=3" | sudo -n tee -a mount/boot/cmdline.txt >/dev/null
 # https://github.com/jgarff/rpi_ws281x?tab=readme-ov-file#spi
 echo -n " spidev.bufsiz=32768" | sudo -n tee -a mount/boot/cmdline.txt >/dev/null
 
-
-sudo -n cp wpa_supplicant.conf mount/etc/wpa_supplicant/wpa_supplicant.conf
 sudo -n mkdir -p mount/opt/
 sudo -n cp firstboot.sh mount/opt/firstboot.sh
+sudo -n cp firstboot-wifi.sh mount/opt/firstboot-wifi.sh
 sudo -n cp cce-firstboot.service mount/etc/systemd/system/cce-firstboot.service
 sudo -n ln -s /etc/systemd/system/cce-firstboot.service mount/etc/systemd/system/multi-user.target.wants/cce-firstboot.service
 

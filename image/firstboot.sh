@@ -19,4 +19,6 @@ apt-get remove -y bluez bluez-firmware pi-bluetooth triggerhappy pigpio
 
 apt-get install -y vim
 
+/opt/firstboot-wifi.sh
+
 systemctl disable cce-firstboot
