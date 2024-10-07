@@ -20,21 +20,21 @@ mkdir -p mount/
 # Set up mountpoint:
 LODEV="$(sudo -n losetup --show -P -f "$3")"
 sudo -n mount -o loop "$LODEV"p2 mount/
-sudo -n mount -o loop "$LODEV"p1 mount/boot/firmware/
+sudo -n mount -o loop "$LODEV"p1 mount/boot/
 
 redo-ifchange wpa_supplicant.conf userconf.txt firstboot.sh cce-firstboot.service config.txt
 
-sudo -n cp userconf.txt mount/boot/firmware/userconf.txt
+sudo -n cp userconf.txt mount/boot/userconf.txt
 echo >&2 "Updating config.txt:"
-diff >&2 mount/boot/firmware/config.txt config.txt || true
-sudo -n cp config.txt mount/boot/firmware/config.txt
+diff >&2 mount/boot/config.txt config.txt || true
+sudo -n cp config.txt mount/boot/config.txt
 
 # For better LED matrix performance:
 # https://access.redhat.com/solutions/480473
-echo -n " isolcpus=3" >>mount/boot/firmware/cmdline.txt
+echo -n " isolcpus=3" | sudo -n tee -a mount/boot/cmdline.txt >/dev/null
 # For SPI use for NeoPixel driver:
 # https://github.com/jgarff/rpi_ws281x?tab=readme-ov-file#spi
-echo -n " spidev.bufsiz=32768" >>mount/boot/firmware/cmdline.txt
+echo -n " spidev.bufsiz=32768" | sudo -n tee -a mount/boot/cmdline.txt >/dev/null
 
 
 sudo -n cp wpa_supplicant.conf mount/etc/wpa_supplicant/wpa_supplicant.conf
@@ -45,6 +45,7 @@ sudo -n ln -s /etc/systemd/system/cce-firstboot.service mount/etc/systemd/system
 
 # Remove mountpoint (-R ecursive -d etach loop device)
 sudo -n umount -Rd mount/
+sudo -n losetup -d "$LODEV"
 sync
 
 echo >&2 "Baseline image ready"
