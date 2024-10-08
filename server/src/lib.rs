@@ -18,13 +18,52 @@ use std::{
 use rpi_led_matrix::{LedColor, LedMatrix, LedMatrixOptions};
 use rs_ws281x::{ChannelBuilder, ControllerBuilder};
 
-const INTERVAL: Duration = Duration::from_millis(100);
+const INTERVAL: Duration = Duration::from_millis(10);
 
 pub fn run_display(run: &AtomicBool) -> Result<(), &'static str> {
     let mut options = LedMatrixOptions::new();
-    options.set_rows(32);
-    options.set_cols(16);
+    const ROWS: u32 = 16;
+    const COLS: u32 = 16;
+    options.set_rows(ROWS);
+    options.set_cols(COLS);
     options.set_refresh_rate(false);
+
+    // 16R16C accurately covers the low rows,
+    // but duplicates them to the high.
+    // 16R32C keeps going along a row, to columns that don't exist.
+    // 32R16C loops back over columns that already exist, and mirrors.
+    //
+    // In the 16C32 case, our grid is:
+    // row 0: col 0-16 (of 32)
+    // row 1: col 0-16 (of 32)
+    // as if there's a missing additional 16-column panel.
+    // That kinda makes sense: there is, if this was a 32x32.
+    //
+    // If we use 32x32... the addresses don't work out.
+    // It's zig-zaggy? does half a row, then the whole row, then the second half
+    // options.set_row_addr_type(2);
+    // options.set_multiplexing(4);
+    // So: 16x32 is "the right" way to get the addresses.
+    //
+    // ... how did I have this set up in Python? 16x32, one chain, one parallel.
+    // But I don't know how that worked :D
+    //
+    // "cols * chain length is the total length of the display..."
+    // per docstring. So we *should* use 32R16C.
+    // With "chain length 2", 32R16C only covers the first 8 columns (twice each),
+    // but it does cover all 32 rows.
+    // With "chain length 2", 16R16C goes through the first half of the board, once....
+    // With "chain length 1", 16R16C goes through the first half of the board, once,
+    // but also ghosts to the second half.
+    options.set_chain_length(2);
+    options.set_parallel(1);
+
+    // Ah!
+    // With "chain length 2", 16R16C goes through the first half of the board, once....
+    // because we stop when we get to the first half!
+    // So our answer is that this behaves as two chained 16x16 panels,
+    // and we have to handle going "past the edge" of a single panel.
+
     // TODO: Consider shorting pin 18, using PWM
     options.set_hardware_mapping("adafruit-hat");
     // Default runtime options, for now.
@@ -41,20 +80,22 @@ pub fn run_display(run: &AtomicBool) -> Result<(), &'static str> {
         blue: 0,
     };
 
-    let mut r = 0;
-    let mut c = 0;
+    let mut r: u32 = 0;
+    let mut c: u32 = 0;
     let mut canvas = matrix.offscreen_canvas();
     tracing::info!("starting display loop");
     while run.load(Relaxed) {
+        tracing::info!("{},{}", r, c);
         canvas.fill(&off);
-        for r_ in 0..r {
-            for c_ in 0..c {
-                canvas.draw_circle(r_, c_, 1, &color);
-            }
-        }
+        canvas.set(r as i32, c as i32, &color);
         canvas = matrix.swap(canvas);
-        r = (r + 1) % 32;
-        c = (c + 1) % 16;
+        c = (c + 1) % COLS;
+        if c == 0 {
+            r = (r + 1) % (ROWS * 2);
+        }
+        if r == 0 && c == 0 {
+            break;
+        }
 
         thread::sleep(INTERVAL);
     }

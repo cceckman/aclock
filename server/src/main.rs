@@ -13,11 +13,19 @@ pub fn main() {
 
     let run = AtomicBool::new(true);
     std::thread::scope(|s| {
-        let neopixel = s.spawn(|| run_neopixels(&run));
-        let matrix = s.spawn(|| run_display(&run));
+        let neopixel = s.spawn(|| {
+            let r = run_neopixels(&run);
+            run.store(false, Ordering::SeqCst);
+            r.unwrap();
+        });
+        let matrix = s.spawn(|| {
+            let r = run_display(&run);
+            run.store(false, Ordering::SeqCst);
+            r.unwrap();
+        });
         let timer = s.spawn(|| {
             let now = time::Instant::now();
-            let deadline = now + Duration::from_secs(10);
+            let deadline = now + Duration::from_secs(30);
             tracing::info!("starting timer loop");
             while run.load(Ordering::Relaxed) && Instant::now() < deadline {
                 // Responsive, but not too busy
@@ -27,14 +35,8 @@ pub fn main() {
             run.store(false, atomic::Ordering::SeqCst);
         });
 
-        neopixel
-            .join()
-            .expect("could not join neopixel thread")
-            .expect("error in neopixel thread");
-        matrix
-            .join()
-            .expect("could not join matrix thread")
-            .expect("error in matrix thread");
+        neopixel.join().expect("could not join neopixel thread");
+        matrix.join().expect("could not join matrix thread");
         timer.join().expect("could not join timer thread");
     });
     tracing::info!("all done!");
