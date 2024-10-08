@@ -22,8 +22,8 @@ const INTERVAL: Duration = Duration::from_millis(100);
 
 pub fn run_display(run: &AtomicBool) -> Result<(), &'static str> {
     let mut options = LedMatrixOptions::new();
-    options.set_rows(16);
-    options.set_cols(32);
+    options.set_rows(32);
+    options.set_cols(16);
     options.set_refresh_rate(false);
     // TODO: Consider shorting pin 18, using PWM
     options.set_hardware_mapping("adafruit-hat");
@@ -35,20 +35,26 @@ pub fn run_display(run: &AtomicBool) -> Result<(), &'static str> {
         green: 64,
         blue: 64,
     };
+    let off = LedColor {
+        red: 0,
+        green: 0,
+        blue: 0,
+    };
 
     let mut r = 0;
     let mut c = 0;
     let mut canvas = matrix.offscreen_canvas();
     tracing::info!("starting display loop");
     while run.load(Relaxed) {
+        canvas.fill(&off);
         for r_ in 0..r {
             for c_ in 0..c {
                 canvas.draw_circle(r_, c_, 1, &color);
             }
         }
         canvas = matrix.swap(canvas);
-        r = (r + 1) % 16;
-        c = (c + 1) % 32;
+        r = (r + 1) % 32;
+        c = (c + 1) % 16;
 
         thread::sleep(INTERVAL);
     }
@@ -58,7 +64,7 @@ pub fn run_display(run: &AtomicBool) -> Result<(), &'static str> {
 
 /// Run a neopixel display.
 pub fn run_neopixels(run: &AtomicBool) -> Result<(), rs_ws281x::WS2811Error> {
-    const STRIP_SIZE: i32 = 60; // 1 meter at 60/meter
+    const STRIP_SIZE: usize = 60; // 1 meter at 60/meter
 
     let mut controller = ControllerBuilder::new()
         .freq(800_000)
@@ -67,7 +73,7 @@ pub fn run_neopixels(run: &AtomicBool) -> Result<(), rs_ws281x::WS2811Error> {
             0,
             ChannelBuilder::new()
                 .pin(10) // SPI MOSI
-                .count(STRIP_SIZE)
+                .count(STRIP_SIZE as i32)
                 .strip_type(rs_ws281x::StripType::Sk6812Rgbw)
                 .brightness(20)
                 .build(),
@@ -81,16 +87,28 @@ pub fn run_neopixels(run: &AtomicBool) -> Result<(), rs_ws281x::WS2811Error> {
 
         let leds = controller.leds_mut(0);
         for (i, led) in leds.iter_mut().enumerate() {
-            let brightness_fraction = (i + offset) as f64 / STRIP_SIZE as f64;
-            let brightness_sin = (brightness_fraction * PI * 2.0).sin() * 0.5 + 0.5;
+            let brightness_fraction = ((i + offset) % STRIP_SIZE) as f64 / STRIP_SIZE as f64;
+            assert!(brightness_fraction >= 0.0);
+            assert!(brightness_fraction <= 1.0);
+            let brightness_sin = (brightness_fraction * PI * 2.0).sin();
             // Normalize between 0 and 1: add 1 to get range (0, 2), then divide
             let brightness_sin = (brightness_sin + 1.0) / 2.0;
-            let brigntess_int = ((brightness_sin * 255.0) as usize).clamp(0, 255) as u8;
-            *led = [0, 0, 0, brigntess_int];
+            let brightness_int = ((brightness_sin * 255.0) as usize).clamp(0, 255) as u8;
+            *led = [
+                brightness_int,
+                brightness_int,
+                brightness_int,
+                brightness_int,
+            ];
         }
         controller.render()?;
         thread::sleep(INTERVAL);
     }
+    tracing::info!("clearing neopixels");
+    for led in controller.leds_mut(0) {
+        *led = [0, 0, 0, 0];
+    }
+    controller.render()?;
     tracing::info!("ending neopixel loop");
     Ok(())
 }
