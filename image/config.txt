@@ -5,7 +5,8 @@
 # Uncomment some or all of these to enable the optional hardware interfaces
 #dtparam=i2c_arm=on
 #dtparam=i2s=on
-#dtparam=spi=on
+# ENABLED for aclock
+dtparam=spi=on
 
 # Enable audio (loads snd_bcm2835)
 # DISABLED for aclock
