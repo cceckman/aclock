@@ -9,7 +9,6 @@
 //! - g++-aarch64-linux-gnu for cross-compilation
 //!
 use std::{
-    f64::consts::PI,
     sync::atomic::{AtomicBool, Ordering::Relaxed},
     thread,
     time::Duration,
@@ -20,7 +19,7 @@ pub mod edge;
 use chrono::{DateTime, Local};
 use edge::get_pixels;
 use rpi_led_matrix::{LedColor, LedMatrix, LedMatrixOptions};
-use rs_ws281x::{ChannelBuilder, ControllerBuilder, WS2811Error};
+use rs_ws281x::{ChannelBuilder, ControllerBuilder};
 
 const INTERVAL: Duration = Duration::from_millis(10);
 
@@ -89,7 +88,6 @@ pub fn run_display(run: &AtomicBool) -> Result<(), &'static str> {
     let mut canvas = matrix.offscreen_canvas();
     tracing::info!("starting display loop");
     while run.load(Relaxed) {
-        tracing::info!("{},{}", r, c);
         canvas.fill(&off);
         canvas.set(r as i32, c as i32, &color);
         canvas = matrix.swap(canvas);
@@ -119,18 +117,24 @@ pub fn run_neopixels(run: &AtomicBool) -> Result<(), String> {
             ChannelBuilder::new()
                 .pin(10) // SPI MOSI
                 .count(STRIP_SIZE as i32)
-                .strip_type(rs_ws281x::StripType::Sk6812Rgbw)
-                .brightness(20)
+                // Datasheet says RGBW, but this is what
+                // I've got.
+                .strip_type(rs_ws281x::StripType::Sk6812Gbrw)
+                .brightness(100)
                 .build(),
         )
         .build()
         .map_err(|v| v.to_string())?;
 
     tracing::info!("starting neopixel loop");
+    let leds = controller.leds_mut(0);
+    get_pixels(Local::now(), leds)?;
+    controller.render().map_err(|v| v.to_string())?;
+
     while run.load(Relaxed) {
-        let leds = controller.leds_mut(0);
-        get_pixels(Local::now(), leds)?;
-        controller.render().map_err(|v| v.to_string())?;
+        // This is the interval of "poll for stop signal",
+        // not necessarily the interval for "re-render".
+        // TODO: better cancellation (async?)
         thread::sleep(INTERVAL);
     }
     tracing::info!("clearing neopixels");
