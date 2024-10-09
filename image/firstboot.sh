@@ -3,6 +3,9 @@
 set -e
 # First-boot setup that Raspbian doesn't like to let us do itself.
 
+raspi-config nonint do_change_timezone "America/New_York"
+raspi-config nonint do_change_locale "en_US.UTF-8 UTF-8"
+
 while ! test -d /home/cceckman/
 do
   sleep 30
