@@ -15,8 +15,12 @@ use std::{
     time::Duration,
 };
 
+pub mod edge;
+
+use chrono::{DateTime, Local};
+use edge::get_pixels;
 use rpi_led_matrix::{LedColor, LedMatrix, LedMatrixOptions};
-use rs_ws281x::{ChannelBuilder, ControllerBuilder};
+use rs_ws281x::{ChannelBuilder, ControllerBuilder, WS2811Error};
 
 const INTERVAL: Duration = Duration::from_millis(10);
 
@@ -104,7 +108,7 @@ pub fn run_display(run: &AtomicBool) -> Result<(), &'static str> {
 }
 
 /// Run a neopixel display.
-pub fn run_neopixels(run: &AtomicBool) -> Result<(), rs_ws281x::WS2811Error> {
+pub fn run_neopixels(run: &AtomicBool) -> Result<(), String> {
     const STRIP_SIZE: usize = 60; // 1 meter at 60/meter
 
     let mut controller = ControllerBuilder::new()
@@ -119,37 +123,21 @@ pub fn run_neopixels(run: &AtomicBool) -> Result<(), rs_ws281x::WS2811Error> {
                 .brightness(20)
                 .build(),
         )
-        .build()?;
+        .build()
+        .map_err(|v| v.to_string())?;
 
-    let mut offset = 0;
     tracing::info!("starting neopixel loop");
     while run.load(Relaxed) {
-        offset += 1;
-
         let leds = controller.leds_mut(0);
-        for (i, led) in leds.iter_mut().enumerate() {
-            let brightness_fraction = ((i + offset) % STRIP_SIZE) as f64 / STRIP_SIZE as f64;
-            assert!(brightness_fraction >= 0.0);
-            assert!(brightness_fraction <= 1.0);
-            let brightness_sin = (brightness_fraction * PI * 2.0).sin();
-            // Normalize between 0 and 1: add 1 to get range (0, 2), then divide
-            let brightness_sin = (brightness_sin + 1.0) / 2.0;
-            let brightness_int = ((brightness_sin * 255.0) as usize).clamp(0, 255) as u8;
-            *led = [
-                brightness_int,
-                brightness_int,
-                brightness_int,
-                brightness_int,
-            ];
-        }
-        controller.render()?;
+        get_pixels(Local::now(), leds)?;
+        controller.render().map_err(|v| v.to_string())?;
         thread::sleep(INTERVAL);
     }
     tracing::info!("clearing neopixels");
     for led in controller.leds_mut(0) {
         *led = [0, 0, 0, 0];
     }
-    controller.render()?;
+    controller.render().map_err(|v| v.to_string())?;
     tracing::info!("ending neopixel loop");
     Ok(())
 }
