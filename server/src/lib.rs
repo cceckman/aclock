@@ -9,100 +9,88 @@
 //! - g++-aarch64-linux-gnu for cross-compilation
 //!
 use std::{
-    sync::atomic::{AtomicBool, Ordering::Relaxed},
+    convert::Infallible,
+    mem::transmute_copy,
+    sync::atomic::{
+        AtomicBool,
+        Ordering::{self, Relaxed},
+    },
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 pub mod edge;
+pub mod face;
 
-use chrono::{DateTime, Local};
+use chrono::{Local, SubsecRound};
 use edge::get_pixels;
-use rpi_led_matrix::{LedColor, LedMatrix, LedMatrixOptions};
+use embedded_graphics_core::pixelcolor::Rgb888;
+use face::{get_clock, get_face};
 use rs_ws281x::{ChannelBuilder, ControllerBuilder};
 
 const INTERVAL: Duration = Duration::from_millis(10);
 
-pub fn run_display(run: &AtomicBool) -> Result<(), &'static str> {
-    let mut options = LedMatrixOptions::new();
-    const ROWS: u32 = 16;
-    const COLS: u32 = 16;
-    options.set_rows(ROWS);
-    options.set_cols(COLS);
-    options.set_refresh_rate(false);
+/// An Edge is a renderer for the edge lights.
+/// In real hardware, this is a line of RGBW NeoPixels.
+pub trait Edge {
+    /// Access the data buffer
+    fn data(&mut self) -> &mut [edge::NeoPixelColor];
 
-    // 16R16C accurately covers the low rows,
-    // but duplicates them to the high.
-    // 16R32C keeps going along a row, to columns that don't exist.
-    // 32R16C loops back over columns that already exist, and mirrors.
-    //
-    // In the 16C32 case, our grid is:
-    // row 0: col 0-16 (of 32)
-    // row 1: col 0-16 (of 32)
-    // as if there's a missing additional 16-column panel.
-    // That kinda makes sense: there is, if this was a 32x32.
-    //
-    // If we use 32x32... the addresses don't work out.
-    // It's zig-zaggy? does half a row, then the whole row, then the second half
-    // options.set_row_addr_type(2);
-    // options.set_multiplexing(4);
-    // So: 16x32 is "the right" way to get the addresses.
-    //
-    // ... how did I have this set up in Python? 16x32, one chain, one parallel.
-    // But I don't know how that worked :D
-    //
-    // "cols * chain length is the total length of the display..."
-    // per docstring. So we *should* use 32R16C.
-    // With "chain length 2", 32R16C only covers the first 8 columns (twice each),
-    // but it does cover all 32 rows.
-    // With "chain length 2", 16R16C goes through the first half of the board, once....
-    // With "chain length 1", 16R16C goes through the first half of the board, once,
-    // but also ghosts to the second half.
-    options.set_chain_length(2);
-    options.set_parallel(1);
+    /// Flush the most recently-written data to the lights.
+    fn flush(&mut self) -> Result<(), String>;
+}
 
-    // Ah!
-    // With "chain length 2", 16R16C goes through the first half of the board, once....
-    // because we stop when we get to the first half!
-    // So our answer is that this behaves as two chained 16x16 panels,
-    // and we have to handle going "past the edge" of a single panel.
+/// A Face is a renderer for the face display.
+/// In real hardware, this is a 32x16 LED matrix.
+pub trait Face {
+    /// Access the underlying drawable of this face.
+    fn drawable(
+        &mut self,
+    ) -> &mut impl embedded_graphics_core::draw_target::DrawTarget<Color = Rgb888, Error = Infallible>;
 
-    // TODO: Consider shorting pin 18, using PWM
-    options.set_hardware_mapping("adafruit-hat");
-    // Default runtime options, for now.
-    let matrix = LedMatrix::new(Some(options), None)?;
+    /// Flush any pending pixels (i.e. v-sync)
+    fn flush(&mut self);
+}
 
-    let color = LedColor {
-        red: 64,
-        green: 64,
-        blue: 64,
-    };
-    let off = LedColor {
-        red: 0,
-        green: 0,
-        blue: 0,
-    };
+/// Display routine.
+pub fn run() {
+    let run = AtomicBool::new(true);
+    std::thread::scope(|s| {
+        //let neopixel = s.spawn(|| {
+        //    let r = run_neopixels(run);
+        //    run.store(false, Ordering::SeqCst);
+        //    r.unwrap();
+        //});
+        let matrix = s.spawn(|| {
+            let mut face = get_face().expect("should create matrix");
+            while run.load(Ordering::Relaxed) {
+                let t = Local::now();
+                tracing::info!("rendering clock at {}", t);
+                get_clock(t, &mut face);
 
-    let mut r: u32 = 0;
-    let mut c: u32 = 0;
-    let mut canvas = matrix.offscreen_canvas();
-    tracing::info!("starting display loop");
-    while run.load(Relaxed) {
-        canvas.fill(&off);
-        canvas.set(r as i32, c as i32, &color);
-        canvas = matrix.swap(canvas);
-        c = (c + 1) % COLS;
-        if c == 0 {
-            r = (r + 1) % (ROWS * 2);
-        }
-        if r == 0 && c == 0 {
-            break;
-        }
+                // Sleep until _almost_ the next second.
+                let frac = (1000 - t.timestamp_subsec_millis()) as i32;
+                let sleep = std::cmp::max(frac - 10, 10);
+                std::thread::sleep(Duration::from_millis(sleep as u64));
+            }
+            run.store(false, Ordering::SeqCst);
+        });
+        let timer = s.spawn(|| {
+            let now = Instant::now();
+            let deadline = now + Duration::from_secs(60);
+            tracing::info!("starting timer loop");
+            while run.load(Ordering::Relaxed) && Instant::now() < deadline {
+                // Responsive, but not too busy
+                thread::sleep(Duration::from_millis(100));
+            }
+            tracing::info!("ending timer");
+            run.store(false, Ordering::SeqCst);
+        });
 
-        thread::sleep(INTERVAL);
-    }
-    tracing::info!("ending display loop");
-    Ok(())
+        // neopixel.join().expect("could not join neopixel thread");
+        matrix.join().expect("could not join matrix thread");
+        timer.join().expect("could not join timer thread");
+    });
 }
 
 /// Run a neopixel display.
