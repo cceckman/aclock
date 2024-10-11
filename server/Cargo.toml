@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 chrono = { version = "0.4.38", features = ["clock", "std"], default-features = false }
+ctrlc = "3.4.5"
 # TODO:
 # Held back because rpi-led-matrix uses 0.3.3 specifically (!)
 embedded-graphics = "0.7.1"

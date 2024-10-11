@@ -10,19 +10,18 @@
 //!
 use std::{
     convert::Infallible,
-    mem::transmute_copy,
-    sync::atomic::{
-        AtomicBool,
-        Ordering::{self, Relaxed},
-    },
+    sync::atomic::{AtomicBool, Ordering::Relaxed},
     thread,
-    time::{Duration, Instant},
+    time::Duration,
 };
+
+mod context;
 
 pub mod edge;
 pub mod face;
 
-use chrono::{Local, SubsecRound};
+use chrono::Local;
+use context::Context;
 use edge::get_pixels;
 use embedded_graphics_core::pixelcolor::Rgb888;
 use face::{get_clock, get_face};
@@ -54,8 +53,12 @@ pub trait Face {
 
 /// Display routine.
 pub fn run() {
-    let run = AtomicBool::new(true);
+    let ctx = Context::new();
     std::thread::scope(|s| {
+        {
+            let ctx = ctx.clone();
+            ctrlc::set_handler(move || ctx.cancel()).expect("could not set ctrl-c handler");
+        }
         //let neopixel = s.spawn(|| {
         //    let r = run_neopixels(run);
         //    run.store(false, Ordering::SeqCst);
@@ -63,7 +66,7 @@ pub fn run() {
         //});
         let matrix = s.spawn(|| {
             let mut face = get_face().expect("should create matrix");
-            while run.load(Ordering::Relaxed) {
+            while !ctx.is_cancelled() {
                 let t = Local::now();
                 tracing::info!("rendering clock at {}", t);
                 get_clock(t, &mut face);
@@ -71,20 +74,15 @@ pub fn run() {
                 // Sleep until _almost_ the next second.
                 let frac = (1000 - t.timestamp_subsec_millis()) as i32;
                 let sleep = std::cmp::max(frac - 10, 10);
-                std::thread::sleep(Duration::from_millis(sleep as u64));
+                ctx.wait_timeout(Duration::from_millis(sleep as u64));
             }
-            run.store(false, Ordering::SeqCst);
+            ctx.cancel()
         });
         let timer = s.spawn(|| {
-            let now = Instant::now();
-            let deadline = now + Duration::from_secs(60);
-            tracing::info!("starting timer loop");
-            while run.load(Ordering::Relaxed) && Instant::now() < deadline {
-                // Responsive, but not too busy
-                thread::sleep(Duration::from_millis(100));
-            }
+            tracing::info!("starting timer");
+            ctx.wait_timeout(Duration::from_secs(60));
             tracing::info!("ending timer");
-            run.store(false, Ordering::SeqCst);
+            ctx.cancel()
         });
 
         // neopixel.join().expect("could not join neopixel thread");
