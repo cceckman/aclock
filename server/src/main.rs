@@ -1,4 +1,4 @@
-use server::context::{self, Context};
+use server::context::Context;
 
 fn main() {
     tracing_subscriber::fmt::init();
@@ -13,6 +13,12 @@ fn main() {
         .expect("could not set SIGINT handler");
     }
 
-    server::run(&ctx);
+    #[cfg(feature = "simulator")]
+    let mut displays = server::simulator::SimDisplays::new();
+
+    #[cfg(not(feature = "simulator"))]
+    let mut displays = server::LedDisplays::new();
+
+    server::run(&ctx, &mut displays);
     tracing::info!("shut down");
 }

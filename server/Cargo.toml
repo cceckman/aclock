@@ -24,9 +24,5 @@ rpi-led-matrix = {version = "0.4.0", features = ["c-stubs", "embeddedgraphics"]}
 
 [features]
 simulator = ["dep:embedded-graphics-simulator"]
-default = ["simulator"]
-
-[[bin]]
-name = "pixel_demo"
-required-features = ["simulator"]
+# default = ["simulator"]
 
