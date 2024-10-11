@@ -5,19 +5,26 @@ use chrono::{DateTime, Local};
 use chrono::{Timelike, Utc};
 use satkit::{lpephem::sun::riseset, AstroTime, ITRFCoord};
 
-const MIN_DAYLIGHT: f32 = 0.05;
+use crate::Displays;
+
+const MIN_DAYLIGHT: f32 = 0.25;
+// MIN_DAYLIGHT is a 3- or 4-channel value; NIGHTLIGHT is not.
+// Scale NIGHTLIGHT accordingly.
+const MAX_NIGHTLIGHT: f32 = MIN_DAYLIGHT * 1.8;
 
 /// Alias for a color of NeoPixel.
 pub type NeoPixelColor = [u8; 4];
 
 /// Compute the pixel colors for the given date.
 /// (The time component is ignored.)
-pub fn get_pixels(time: DateTime<Local>, output: &mut [NeoPixelColor]) -> Result<(), String> {
-    let len = output.len();
-    for (i, px) in output.iter_mut().enumerate() {
-        let v = ((i * 255) / len).clamp(0, 255) as u8;
-        *px = [v, v, v, v];
-    }
+pub fn get_pixels(time: DateTime<Local>, displays: &mut impl Displays) -> Result<(), String> {
+    let output = displays.edge();
+    // Test version:
+    //let len = output.len();
+    //for (i, px) in output.iter_mut().enumerate() {
+    //    let v = ((i * 255) / len).clamp(0, 255) as u8;
+    //    *px = [v, v, v, v];
+    //}
 
     let astro = AstroTime::from_unixtime(time.to_utc().timestamp() as f64);
     // Wilmington, DE
@@ -28,7 +35,7 @@ pub fn get_pixels(time: DateTime<Local>, output: &mut [NeoPixelColor]) -> Result
     // The above function returns the next two times the sun hits the horizon,
     // but they may be (rise, set) or (set, rise) depending on the specified time.
 
-    tracing::info!("next: {} after: {}", a, b);
+    tracing::trace!("next: {} after: {}", a, b);
     // Convert both of them to coordinates around the face.
     let [a, b]: [f32; 2] = [a, b]
         .map(|v| {
@@ -36,7 +43,7 @@ pub fn get_pixels(time: DateTime<Local>, output: &mut [NeoPixelColor]) -> Result
         })
         .map(|v: DateTime<Utc>| {
             let time = v.with_timezone(&Local).time();
-            tracing::info!("local: {}", time);
+            tracing::trace!("local: {}", time);
             let h = time.hour();
             let m = time.minute();
             // Convert to a fraction of the day, at a minute granualirty.
@@ -62,10 +69,12 @@ pub fn get_pixels(time: DateTime<Local>, output: &mut [NeoPixelColor]) -> Result
 
             // Then re-range to 0..=255.
             let amt = (f * 255.0).clamp(0.0, 255.0) as u8;
-            tracing::info!(
-                "point {i:02}:   day fraction {day_fraction:.2}, sin {sin:.2}, amt {amt:0}",
+            tracing::trace!(
+                "point {i:03}:   day fraction {day_fraction:.2}, sin {sin:.2}, amt {amt:0}",
             );
-            *px = [0, 0, 0, amt];
+            // TODO: Using RGB so it shows up on the simulator.
+            // How do we use / render W channel?
+            *px = [amt, amt, amt, amt];
         } else {
             // Normalize to "tomorrow night"
             let night_point = if date_fraction < rise {
@@ -75,16 +84,15 @@ pub fn get_pixels(time: DateTime<Local>, output: &mut [NeoPixelColor]) -> Result
             };
             let night_fraction = (night_point - set) / ((rise + 1.0) - set);
             let sin = (night_fraction * PI).sin();
-            // and subtract that out from the daylight:
-            let f = MIN_DAYLIGHT - (MIN_DAYLIGHT * sin);
+            // and subtract that out from the maximum:
+            let f = MAX_NIGHTLIGHT - (MAX_NIGHTLIGHT * sin);
             let amt = (f * 255.0).clamp(0.0, 255.0) as u8;
-            tracing::info!(
-                "point {i:02}: night fraction {night_fraction:.2}, sin {sin:.2}, amt {amt:0}",
+            tracing::trace!(
+                "point {i:03}: night fraction {night_fraction:.2}, sin {sin:.2}, amt {amt:0}",
             );
             // Night is only blue, for now.
             *px = [0, 0, amt, 0];
         }
     }
-
     Ok(())
 }

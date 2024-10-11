@@ -11,6 +11,6 @@ else
 fi
 
 OUTPUT="$(
-    cargo build $TARGET --message-format=json \
+    cargo build $TARGET --message-format=json --no-default-features \
         | jq -r 'select(.reason == "compiler-artifact") | select(.executable) | .executable')"
 cp "$OUTPUT" "$3"

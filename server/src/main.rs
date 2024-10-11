@@ -1,43 +1,24 @@
-//! Main binary: try to run both loops.
+use server::context::Context;
 
-use std::{
-    sync::atomic::{self, AtomicBool, Ordering},
-    thread,
-    time::{self, Duration, Instant},
-};
+fn main() {
+    tracing_subscriber::fmt::init();
 
-use server::{run_display, run_neopixels};
+    let ctx = Context::new();
+    {
+        let ctx = ctx.clone();
+        ctrlc::set_handler(move || {
+            tracing::info!("got SIGINT, closing context");
+            ctx.cancel();
+        })
+        .expect("could not set SIGINT handler");
+    }
 
-pub fn main() {
-    tracing_subscriber::fmt().init();
+    #[cfg(feature = "simulator")]
+    let mut displays = server::simulator::SimDisplays::new();
 
-    let run = AtomicBool::new(true);
-    std::thread::scope(|s| {
-        let neopixel = s.spawn(|| {
-            let r = run_neopixels(&run);
-            run.store(false, Ordering::SeqCst);
-            r.unwrap();
-        });
-        let matrix = s.spawn(|| {
-            let r = run_display(&run);
-            run.store(false, Ordering::SeqCst);
-            r.unwrap();
-        });
-        let timer = s.spawn(|| {
-            let now = time::Instant::now();
-            let deadline = now + Duration::from_secs(30);
-            tracing::info!("starting timer loop");
-            while run.load(Ordering::Relaxed) && Instant::now() < deadline {
-                // Responsive, but not too busy
-                thread::sleep(Duration::from_millis(100));
-            }
-            tracing::info!("ending timer");
-            run.store(false, atomic::Ordering::SeqCst);
-        });
+    #[cfg(not(feature = "simulator"))]
+    let mut displays = server::LedDisplays::new();
 
-        neopixel.join().expect("could not join neopixel thread");
-        matrix.join().expect("could not join matrix thread");
-        timer.join().expect("could not join timer thread");
-    });
-    tracing::info!("all done!");
+    server::run(&ctx, &mut displays);
+    tracing::info!("shut down");
 }

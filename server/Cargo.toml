@@ -5,22 +5,24 @@ edition = "2021"
 
 [dependencies]
 chrono = { version = "0.4.38", features = ["clock", "std"], default-features = false }
-embedded-graphics = "0.8.1"
-embedded-graphics-simulator = { version = "0.7.0", optional = true }
+ctrlc = "3.4.5"
+# TODO:
+# Held back because rpi-led-matrix uses 0.3.3 specifically (!)
+embedded-graphics = "0.7.1"
+embedded-graphics-core = "0.3.3"
+embedded-graphics-simulator = { version = "0.4.1", optional = true }
 rs_ws281x = "0.5.1"
 satkit = "0.3.11"
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 
 [target.'cfg(target_arch="aarch64")'.dependencies]
-rpi-led-matrix = "0.4.0"
+rpi-led-matrix = {version = "0.4.0", features = ["embeddedgraphics"]}
 
 [target.'cfg(not(target_arch="aarch64"))'.dependencies]
-rpi-led-matrix = {version = "0.4.0", features = ["c-stubs"]}
+rpi-led-matrix = {version = "0.4.0", features = ["c-stubs", "embeddedgraphics"]}
 
 [features]
-embedded-graphics-simulator = ["dep:embedded-graphics-simulator"]
+simulator = ["dep:embedded-graphics-simulator"]
+# default = ["simulator"]
 
-[[bin]]
-name = "pixel_demo"
-required-features = ["embedded-graphics-simulator"]
