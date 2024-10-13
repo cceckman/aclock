@@ -13,16 +13,23 @@ use crate::{edge::NeoPixelColor, Displays};
 
 pub struct SimDisplays {
     display: SimulatorDisplay<Rgb888>,
-    window: Window,
+    window: Option<Window>,
     edge: Vec<NeoPixelColor>,
 }
 
 impl SimDisplays {
     pub fn new() -> Self {
-        // Our primary display is 32x16.
-        // We add a border of 2px all the way around:
-        // one for the edge light and one as a buffer (always unlit).
+        let settings = OutputSettingsBuilder::new().scale(20).build();
+        let window = Window::new("A Clock", &settings);
+        let n = Self::new_hidden();
+        SimDisplays {
+            window: Some(window),
+            ..n
+        }
+    }
 
+    /// Creates a new SimDisplays, but without generating a window.
+    pub fn new_hidden() -> Self {
         let size = Size::new(32 + 2 * 2, 16 + 2 * 2);
         let display = SimulatorDisplay::new(size);
 
@@ -32,14 +39,51 @@ impl SimDisplays {
         let mut edge = Vec::with_capacity(count);
         edge.resize(count, NeoPixelColor::default());
 
-        let settings = OutputSettingsBuilder::new().scale(20).build();
-
-        let window = Window::new("Strip", &settings);
         SimDisplays {
-            window,
+            window: None,
             display,
             edge,
         }
+    }
+
+    /// Render the edge pixels onto the screen.
+    fn render_edge(&mut self) {
+        let points = PerimiterTracer::new(self.display.size()).take(self.edge.len());
+        let edge_pixels = self
+            .edge
+            .iter()
+            .map(|color| {
+                let [r, g, b, _w] = *color;
+                // TODO: Incorporate W channel
+                Rgb888::new(r, g, b)
+            })
+            .zip(points)
+            .map(|(c, p)| Pixel(p, c));
+        self.display.draw_iter(edge_pixels).expect("infallible");
+    }
+
+    /// Flush to a screenshot instead of a display.
+    pub fn screenshot(&mut self) -> embedded_graphics_simulator::OutputImage<Rgb888> {
+        let settings = OutputSettingsBuilder::new().scale(20).build();
+        self.render_edge();
+        let img = self.display.to_rgb_output_image(&settings);
+        self.clear();
+        img
+    }
+
+    fn clear(&mut self) {
+        self.display
+            .fill_solid(
+                &Rectangle::new(Point::new(0, 0), self.display.size()),
+                Rgb888::BLACK,
+            )
+            .expect("infallible");
+    }
+}
+
+impl Default for SimDisplays {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -115,28 +159,11 @@ impl Displays for SimDisplays {
     }
 
     fn flush(&mut self) -> Result<(), String> {
-        let points = PerimiterTracer::new(self.display.size()).take(self.edge.len());
-        let edge_pixels = self
-            .edge
-            .iter()
-            .map(|color| {
-                let [r, g, b, _w] = *color;
-                // TODO: Incorporate W channel
-                Rgb888::new(r, g, b)
-            })
-            .zip(points)
-            .map(|(c, p)| Pixel(p, c));
-        let draw = || {
-            self.display.draw_iter(edge_pixels)?;
-            self.window.update(&self.display);
-            // Clear for the next frame.
-            self.display.fill_solid(
-                &Rectangle::new(Point::new(0, 0), self.display.size()),
-                Rgb888::BLACK,
-            )
-        };
-        draw().map_err(|e| e.to_string())?;
-
+        self.render_edge();
+        if let Some(window) = &mut self.window {
+            window.update(&self.display);
+        }
+        self.clear();
         Ok(())
     }
 }

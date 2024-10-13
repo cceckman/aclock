@@ -36,20 +36,19 @@ pub fn get_pixels(time: DateTime<Local>, displays: &mut impl Displays) -> Result
     // but they may be (rise, set) or (set, rise) depending on the specified time.
 
     tracing::trace!("next: {} after: {}", a, b);
+    let [a, b] = [a, b].map(|v| {
+        DateTime::from_timestamp(v.to_unixtime() as i64, 0).expect("could not convert datetime")
+    });
+    let (rise, set) = if a.hour() < b.hour() { (a, b) } else { (b, a) };
     // Convert both of them to coordinates around the face.
-    let [a, b]: [f32; 2] = [a, b]
-        .map(|v| {
-            DateTime::from_timestamp(v.to_unixtime() as i64, 0).expect("could not convert datetime")
-        })
-        .map(|v: DateTime<Utc>| {
-            let time = v.with_timezone(&Local).time();
-            tracing::trace!("local: {}", time);
-            let h = time.hour();
-            let m = time.minute();
-            // Convert to a fraction of the day, at a minute granualirty.
-            (h * 60 + m) as f32 / (24 * 60) as f32
-        });
-    let (rise, set) = if a > b { (b, a) } else { (a, b) };
+    let [rise, set] = [rise, set].map(|v: DateTime<Utc>| {
+        let time = v.with_timezone(&Local).time();
+        tracing::trace!("local: {}", time);
+        let h = time.hour();
+        let m = time.minute();
+        // Convert to a fraction of the day, at a minute granualirty.
+        (h * 60 + m) as f32 / (24 * 60) as f32
+    });
 
     let daylight = set - rise;
 
