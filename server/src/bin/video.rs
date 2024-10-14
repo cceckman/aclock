@@ -88,6 +88,8 @@ pub fn main() {
         .arg(format!("{}/%04d.png", output.path().display()))
         .arg("-loop")
         .arg("0") // infinite loop
+        .arg("-filter:v")
+        .arg("fps=15")
         .arg("-y") // OK to overwrite
         .arg(&outfile)
         .output()

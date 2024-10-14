@@ -13,7 +13,6 @@ embedded-graphics-core = "0.3.3"
 embedded-graphics-simulator = { version = "0.4.1", optional = true }
 num_cpus = { version = "1.16.0", optional = true }
 rs_ws281x = "0.5.1"
-satkit = "0.3.11"
 tempfile = { version = "3.13.0", optional = true }
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"

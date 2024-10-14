@@ -1,11 +1,10 @@
 //! Routine for computing neopixel brightnesses.
 use std::f32::consts::PI;
 
+use chrono::Timelike;
 use chrono::{DateTime, Local};
-use chrono::{Timelike, Utc};
-use satkit::{lpephem::sun::riseset, AstroTime, ITRFCoord};
 
-use crate::Displays;
+use crate::{riseset, Displays};
 
 const MIN_DAYLIGHT: f32 = 0.25;
 // MIN_DAYLIGHT is a 3- or 4-channel value; NIGHTLIGHT is not.
@@ -26,23 +25,12 @@ pub fn get_pixels(time: DateTime<Local>, displays: &mut impl Displays) -> Result
     //    *px = [v, v, v, v];
     //}
 
-    let astro = AstroTime::from_unixtime(time.to_utc().timestamp() as f64);
     // Wilmington, DE
-    let coord = ITRFCoord::from_geodetic_deg(39.7447, -75.539787, 28.0);
-    // "standard" rise and set are slightly off 90 degrees; ignoring that for now.
-    let (a, b) = riseset(&astro, &coord, Some(90.0)).map_err(|err| format!("{}", err))?;
+    let (rise, _noon, set) = riseset::riseset(time, 39.7447, -75.539787);
 
-    // The above function returns the next two times the sun hits the horizon,
-    // but they may be (rise, set) or (set, rise) depending on the specified time.
-
-    tracing::trace!("next: {} after: {}", a, b);
-    let [a, b] = [a, b].map(|v| {
-        DateTime::from_timestamp(v.to_unixtime() as i64, 0).expect("could not convert datetime")
-    });
-    let (rise, set) = if a.hour() < b.hour() { (a, b) } else { (b, a) };
     // Convert both of them to coordinates around the face.
-    let [rise, set] = [rise, set].map(|v: DateTime<Utc>| {
-        let time = v.with_timezone(&Local).time();
+    let [rise, set] = [rise, set].map(|v: DateTime<Local>| {
+        let time = v.time();
         tracing::trace!("local: {}", time);
         let h = time.hour();
         let m = time.minute();
