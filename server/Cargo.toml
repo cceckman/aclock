@@ -11,8 +11,9 @@ ctrlc = "3.4.5"
 embedded-graphics = "0.7.1"
 embedded-graphics-core = "0.3.3"
 embedded-graphics-simulator = { version = "0.4.1", optional = true }
+num_cpus = { version = "1.16.0", optional = true }
 rs_ws281x = "0.5.1"
-satkit = "0.3.11"
+tempfile = { version = "3.13.0", optional = true }
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 
@@ -24,5 +25,9 @@ rpi-led-matrix = {version = "0.4.0", features = ["c-stubs", "embeddedgraphics"]}
 
 [features]
 simulator = ["dep:embedded-graphics-simulator"]
-# default = ["simulator"]
+default = ["video"]
+video = ["simulator", "dep:tempfile", "dep:num_cpus"]
 
+[[bin]]
+name = "video"
+required-features = ["video"]

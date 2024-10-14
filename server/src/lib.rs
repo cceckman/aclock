@@ -14,6 +14,7 @@ pub mod context;
 
 pub mod edge;
 pub mod face;
+pub mod riseset;
 
 #[cfg(feature = "simulator")]
 pub mod simulator;
