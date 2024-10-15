@@ -80,6 +80,8 @@ pub fn main() {
         .arg(format!("{}/%04d.png", output.path().display()))
         .arg("-loop")
         .arg("0") // infinite loop
+        .arg("-lossless")
+        .arg("1")
         .arg("-y") // OK to overwrite
         .arg(&outfile)
         .output()
