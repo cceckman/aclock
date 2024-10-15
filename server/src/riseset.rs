@@ -22,14 +22,14 @@ V2: equation of time
 
 */
 
-use std::f64::consts::PI;
+use std::f32::consts::PI;
 
 use chrono::{DateTime, Datelike, Duration, NaiveDateTime, NaiveTime, Timelike};
 
 pub fn riseset<T: chrono::TimeZone>(
     date: DateTime<T>,
-    latitude: f64,
-    longitude: f64,
+    latitude: f32,
+    longitude: f32,
 ) -> (DateTime<T>, DateTime<T>, DateTime<T>) {
     let yr = date.year();
     // The NOAA equations produce rise and set times in minutes past UTC midnight.
@@ -42,7 +42,7 @@ pub fn riseset<T: chrono::TimeZone>(
 
         // Fractional year in radians
         let ordinal_day = date.ordinal() - 1 + (date.hour() - 12) / 24;
-        let gamma = (2.0 * PI) * (ordinal_day as f64) / (days as f64);
+        let gamma = (2.0 * PI) * (ordinal_day as f32) / (days as f32);
 
         // equation of time, relating mean solar time and true solar time
         let eqtime = 229.18
@@ -59,7 +59,7 @@ pub fn riseset<T: chrono::TimeZone>(
             + 0.00148 * (3.0 * gamma).sin();
 
         // The hour angle of the sunrise and sunset is:
-        let zenith: f64 = (90.833f64).to_radians();
+        let zenith: f32 = (90.833f32).to_radians();
         let lat = latitude.to_radians();
 
         // We diverge from the PDF here and use the spreadsheet's form:

@@ -1,13 +1,9 @@
 //! Generates a video of the display for a whole day/year.
 
-use std::{
-    ops::Range,
-    path::Path,
-    time::{Duration, Instant},
-};
+use std::{ops::Range, path::Path, time::Duration};
 
 use chrono::{DateTime, Local};
-use server::{context::Context, edge::get_pixels, face::get_clock};
+use server::{context::Context, Renderer};
 use tempfile::NamedTempFile;
 
 /// Make screen samples starting from the start time, stepping by the duration, and put them in the
@@ -24,30 +20,22 @@ fn make_samples(
     outdir: &Path,
 ) {
     let mut displays = server::simulator::SimDisplays::new_hidden();
+    let renderer = Renderer::default();
 
     let end = when.end;
 
-    for i in 0.. {
-        let t = when.start + step * (i * parallel_count + offset);
+    for j in 0.. {
+        let i = j * parallel_count + offset;
+        let t = when.start + step * i;
         if t > end || ctx.is_cancelled() {
             break;
         }
-        let start = Instant::now();
-        get_clock(t, &mut displays);
-        get_pixels(t, &mut displays).unwrap();
+        renderer.render(&mut displays, t);
         let buffer = displays.screenshot();
-        let rendered = Instant::now();
 
         let path = outdir.join(format!("{i:04}.png"));
         buffer.save_png(&path).unwrap();
-        let saved = Instant::now();
         // Note: the --release build of the PNG writer is _much_ faster.
-        tracing::trace!(
-            "{:04} -- {:03} rendering, {:03} saving",
-            i,
-            (rendered - start).as_millis(),
-            (saved - rendered).as_millis()
-        );
     }
 }
 
@@ -69,6 +57,7 @@ pub fn main() {
     }
 
     let output = tempfile::Builder::new().keep(false).tempdir().unwrap();
+
     let n: u32 = num_cpus::get().try_into().unwrap();
     let start = Local::now();
     let end = start + Duration::from_secs(365 * 24 * 60 * 60);
@@ -84,12 +73,13 @@ pub fn main() {
 
     tracing::info!("output frames in {}", output.path().display());
     let c = std::process::Command::new("ffmpeg")
+        .arg("-r")
+        .arg("6") // frames per second... *then* provide input frames.
+        // 365 frames: 6fps = ~1 minute video
         .arg("-i")
         .arg(format!("{}/%04d.png", output.path().display()))
         .arg("-loop")
         .arg("0") // infinite loop
-        .arg("-filter:v")
-        .arg("fps=15")
         .arg("-y") // OK to overwrite
         .arg(&outfile)
         .output()

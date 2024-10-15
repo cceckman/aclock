@@ -9,7 +9,7 @@ use embedded_graphics::{
 };
 use embedded_graphics_simulator::{OutputSettingsBuilder, SimulatorDisplay, Window};
 
-use crate::{edge::NeoPixelColor, Displays};
+use crate::{Displays, NeoPixelColor};
 
 pub struct SimDisplays {
     display: SimulatorDisplay<Rgb888>,
@@ -163,7 +163,7 @@ impl Displays for SimDisplays {
         if let Some(window) = &mut self.window {
             window.update(&self.display);
         }
-        self.clear();
+        // self.clear();
         Ok(())
     }
 }

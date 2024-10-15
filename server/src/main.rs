@@ -1,4 +1,7 @@
-use server::context::Context;
+use std::time::Duration;
+
+use chrono::Local;
+use server::{context::Context, Renderer};
 
 fn main() {
     tracing_subscriber::fmt::init();
@@ -19,6 +22,18 @@ fn main() {
     #[cfg(not(feature = "simulator"))]
     let mut displays = server::LedDisplays::new();
 
-    server::run(&ctx, &mut displays);
+    let renderer = Renderer::default();
+    while !ctx.is_cancelled() {
+        let t = Local::now();
+        tracing::info!("rendering clock at {}", t);
+        renderer.render(&mut displays, t);
+
+        // Sleep until _almost_ the next second.
+        let frac = (1000 - t.timestamp_subsec_millis()) as i32;
+        let sleep = std::cmp::max(frac - 10, 10);
+        ctx.wait_timeout(Duration::from_millis(sleep as u64));
+    }
+    ctx.cancel();
+
     tracing::info!("shut down");
 }
