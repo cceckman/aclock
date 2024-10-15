@@ -98,7 +98,7 @@ impl Renderer {
             let time = v.time();
             tracing::trace!("local: {}", time);
             let h = time.hour();
-            let m = time.hour();
+            let m = time.minute();
             // Convert to a fraction of the day, at a minute granualirty.
             (h * 60 + m) as f32 / (24 * 60) as f32
         });
