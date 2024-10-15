@@ -1,4 +1,5 @@
 wpa_supplicant.conf
 userconf.txt
 **/.redo/
+*.webp
 
