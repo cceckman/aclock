@@ -1,6 +1,10 @@
 //! Generates a video of the display for a whole day/year.
 
-use std::{ops::Range, path::Path, time::Duration};
+use std::{
+    ops::Range,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use chrono::{DateTime, Local};
 use server::{context::Context, Renderer};
@@ -80,6 +84,8 @@ pub fn main() {
         .arg(format!("{}/%04d.png", output.path().display()))
         .arg("-loop")
         .arg("0") // infinite loop
+        .arg("-lossless")
+        .arg("1")
         .arg("-y") // OK to overwrite
         .arg(&outfile)
         .output()
@@ -91,6 +97,11 @@ pub fn main() {
         }
         std::process::exit(2);
     }
-    tracing::info!("video in {}", outfile.display());
-    tracing::info!("file://{}", outfile.display());
+    if let Some(name) = std::env::args_os().nth(1) {
+        let p: PathBuf = name.into();
+        std::fs::copy(&outfile, &p).expect("could not copy to destination");
+        tracing::info!("video in {}", p.display());
+    } else {
+        tracing::info!("video in {}", outfile.display());
+    }
 }

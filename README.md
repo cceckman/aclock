@@ -1,4 +1,5 @@
 # aclock
+
 Files to make an overcomplicated clock.
 
 I want a clock that indicates:
@@ -10,6 +11,8 @@ I want a clock that indicates:
 
 The general layout is to have a big (digital) display in the center, and use
 LEDs around the edge to indicate the daylight/nighttime hours.
+
+![Screen over the source of a year](year-example.webp)
 
 ## Active hardware
 
