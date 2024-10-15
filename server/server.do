@@ -1,5 +1,7 @@
 redo-ifchange Cargo.toml Cargo.lock $(find src/)
 
+set -eu
+
 if uname -m | grep -q x86
 then
     export CXX=aarch64-linux-gnu-g++
@@ -10,7 +12,11 @@ else
     TARGET_DIR="target/"
 fi
 
-OUTPUT="$(
-    cargo build $TARGET --message-format=json --no-default-features \
-        | jq -r 'select(.reason == "compiler-artifact") | select(.executable) | .executable')"
+cargo build $TARGET --no-default-features >&2
+
+cargo build $TARGET --message-format=json --no-default-features \
+| jq -r 'select(.target.name == "server") | select(.executable) | .executable' \
+>"$3"
+
+OUTPUT="$(cat "$3")"
 cp "$OUTPUT" "$3"

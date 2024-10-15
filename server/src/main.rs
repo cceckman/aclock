@@ -20,7 +20,7 @@ fn main() {
     let mut displays = server::simulator::SimDisplays::new();
 
     #[cfg(not(feature = "simulator"))]
-    let mut displays = server::LedDisplays::new();
+    let mut displays = server::led_displays::LedDisplays::new().unwrap();
 
     let renderer = Renderer::default();
     while !ctx.is_cancelled() {
