@@ -1,6 +1,6 @@
+///! Display implementation on LED screens.
 use std::convert::Infallible;
 
-///! Display implementation on LED screens.
 use crate::{Displays, NeoPixelColor};
 use embedded_graphics::pixelcolor::Rgb888;
 use rpi_led_matrix::{LedMatrix, LedMatrixOptions};
@@ -29,6 +29,15 @@ impl Displays for LedDisplays {
         let off = self.matrix.offscreen_canvas();
         let _ = self.matrix.swap(off);
         self.strip.render().map_err(|e| e.to_string())
+    }
+}
+
+impl Drop for LedDisplays {
+    fn drop(&mut self) {
+        for px in self.strip.leds_mut(0) {
+            *px = [0, 0, 0, 0];
+        }
+        let _ = self.flush();
     }
 }
 

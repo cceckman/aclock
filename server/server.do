@@ -12,11 +12,10 @@ else
     TARGET_DIR="target/"
 fi
 
-cargo build $TARGET --no-default-features >&2
-
-cargo build $TARGET --message-format=json --no-default-features \
+cargo build --release $TARGET --message-format=json --no-default-features \
 | jq -r 'select(.target.name == "server") | select(.executable) | .executable' \
 >"$3"
 
 OUTPUT="$(cat "$3")"
+rm "$3"
 cp "$OUTPUT" "$3"
