@@ -154,6 +154,8 @@ impl Displays for SimDisplays {
         &mut self,
     ) -> impl embedded_graphics_core::draw_target::DrawTarget<Color = Rgb888, Error = Infallible>
     {
+        // Cropped translates; clipped ensures that OOB writes get dropped.
+        // But clipped borrows from cropped, so we can't chain them, alas.
         self.display
             .cropped(&Rectangle::new(Point::new(2, 2), Size::new(32, 16)))
     }

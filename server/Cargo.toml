@@ -24,9 +24,16 @@ rpi-led-matrix = {version = "0.4.0", features = ["embeddedgraphics"]}
 rpi-led-matrix = {version = "0.4.0", features = ["c-stubs", "embeddedgraphics"]}
 
 [features]
+# Enables the simulator output and disables the LED display output.
 simulator = ["dep:embedded-graphics-simulator"]
-default = ["video"]
+# Enables generating video output from the simulator.
 video = ["simulator", "dep:tempfile", "dep:num_cpus"]
+
+# Enables downloading atmospheric data from US government sources:
+# National Weather Service, AirNow, ...
+atmo-usgov = []
+
+default = ["video", "atmo-usgov"]
 
 [[bin]]
 name = "video"
