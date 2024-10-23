@@ -1,6 +1,7 @@
 //! Types for surfacing atmospheric data.
 
 use chrono::{DateTime, Utc};
+use scd30::I2cBus;
 
 /// A sample of local atmospheric conditions.
 ///
@@ -52,5 +53,26 @@ pub struct FakeAtmosphereSampler {
 impl AtmosphereSampler for FakeAtmosphereSampler {
     fn sample(&mut self) -> AtmosphereSample {
         self.sample
+    }
+}
+
+impl<I> AtmosphereSampler for scd30::SCD30<I>
+where
+    I: I2cBus,
+{
+    fn sample(&mut self) -> AtmosphereSample {
+        if let Ok(s) = self.sample() {
+            AtmosphereSample {
+                timestamp: Utc::now(),
+                temperature: Some(s.temperature),
+                relative_humidity: Some(s.humidity),
+                co2_ppm: Some(s.co2),
+            }
+        } else {
+            AtmosphereSample {
+                timestamp: Utc::now(),
+                ..Default::default()
+            }
+        }
     }
 }

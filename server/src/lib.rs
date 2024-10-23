@@ -18,6 +18,7 @@ pub mod simulator;
 
 pub mod atmosphere;
 pub mod led_displays;
+
 use embedded_graphics::{
     geometry::{Point, Size},
     mono_font::{
