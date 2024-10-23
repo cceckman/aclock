@@ -8,7 +8,8 @@ const PERIOD: Duration = Duration::from_secs(2);
 fn main() {
     let device = I2cdev::new("/dev/i2c-1").expect("could not open i2c device");
 
-    let mut scd30 = scd30::SCD30::new(device, scd30::SCD30Settings::default()).unwrap();
+    let mut scd30 = scd30::SCD30::new(device, scd30::SCD30Settings::default())
+        .expect("could not initialize I2c device");
 
     let mut samples = 0;
     println!("starting measurement...");
