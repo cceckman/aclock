@@ -18,7 +18,8 @@ fn main() {
         println!("getting sample...");
         let v = (&mut scd30 as &mut dyn AtmosphereSampler).sample();
         if let Some(co2) = v.co2_ppm {
-            println!("co2: {:.1}", co2)
+            println!("co2: {:.1}", co2);
+            samples += 1;
         } else {
             println!("waiting...")
         }

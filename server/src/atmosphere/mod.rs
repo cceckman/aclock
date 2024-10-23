@@ -1,7 +1,7 @@
 //! Types for surfacing atmospheric data.
 
 use chrono::{DateTime, Utc};
-use scd30::I2cBus;
+use embedded_hal::i2c::SevenBitAddress;
 
 /// A sample of local atmospheric conditions.
 ///
@@ -58,7 +58,7 @@ impl AtmosphereSampler for FakeAtmosphereSampler {
 
 impl<I> AtmosphereSampler for scd30::SCD30<I>
 where
-    I: I2cBus,
+    I: embedded_hal::i2c::I2c<SevenBitAddress>,
 {
     fn sample(&mut self) -> AtmosphereSample {
         if let Ok(s) = self.sample() {

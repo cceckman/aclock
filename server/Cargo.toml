@@ -17,7 +17,8 @@ tempfile = { version = "3.13.0", optional = true }
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 scd30 = { path = "../scd30/" }
-linux-embedded-hal = { version = "0.4.0", default-features = false, features = ["i2c", "i2cdev"] }
+linux-embedded-hal = { version = "^0.4", default-features = false, features = ["i2c", "i2cdev"] }
+embedded-hal = "^1"
 
 [target.'cfg(target_arch="aarch64")'.dependencies]
 rpi-led-matrix = {version = "0.4.0", features = ["embeddedgraphics"]}
