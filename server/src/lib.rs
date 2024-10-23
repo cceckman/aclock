@@ -31,7 +31,7 @@ use embedded_graphics::{
     Drawable,
 };
 
-use atmosphere::{AtmosphereSample, AtmosphereSampler};
+use atmosphere::{AtmosphereSampler, LastMeasurement};
 use chrono::{DateTime, Datelike, Timelike};
 use embedded_graphics::{
     draw_target::{DrawTarget, DrawTargetExt},
@@ -77,6 +77,10 @@ pub struct RendererSettings {
 pub struct Renderer {
     settings: RendererSettings,
     display_cycle: usize,
+
+    last_co2_ppm: Option<LastMeasurement>,
+    last_temperature: Option<LastMeasurement>,
+    last_relative_humidity: Option<LastMeasurement>,
 }
 
 impl From<RendererSettings> for Renderer {
@@ -84,6 +88,9 @@ impl From<RendererSettings> for Renderer {
         Renderer {
             settings: value,
             display_cycle: 0,
+            last_relative_humidity: None,
+            last_co2_ppm: None,
+            last_temperature: None,
         }
     }
 }
@@ -187,7 +194,21 @@ impl Renderer {
         }
     }
 
-    fn render_face<Tz, D, A>(&mut self, displays: &mut D, _atmosphere: &mut A, time: DateTime<Tz>)
+    fn update_atmo<A>(&mut self, atmosphere: &mut A)
+    where
+        A: AtmosphereSampler,
+    {
+        let s = atmosphere.sample();
+        LastMeasurement::update(&mut self.last_co2_ppm, s.timestamp, s.co2_ppm);
+        LastMeasurement::update(
+            &mut self.last_relative_humidity,
+            s.timestamp,
+            s.relative_humidity,
+        );
+        LastMeasurement::update(&mut self.last_temperature, s.timestamp, s.temperature);
+    }
+
+    fn render_face<Tz, D, A>(&mut self, displays: &mut D, atmosphere: &mut A, time: DateTime<Tz>)
     where
         Tz: chrono::TimeZone,
         D: Displays,
@@ -225,12 +246,12 @@ impl Renderer {
         let mut aux_crop = canvas.cropped(&Rectangle::new(Point::new(0, 9), aux_size));
         let mut aux = aux_crop.clipped(&Rectangle::new(Point::new(0, 0), aux_size));
 
-        let atmo = _atmosphere.sample();
-        if cycle_id == 0 || !self.render_atmo(&mut aux, atmo) {
+        self.update_atmo(atmosphere);
+        if cycle_id == 0 || !self.render_atmo(&mut aux) {
             // Fall back to rendering date
             self.render_date(&mut aux, time);
         }
-        self.render_co2_indicator(&mut aux, atmo);
+        self.render_co2_indicator(&mut aux);
     }
 
     /// Render a CO2 concentration indicator, if available.
@@ -243,10 +264,9 @@ impl Renderer {
     fn render_co2_indicator(
         &self,
         canvas: &mut impl DrawTarget<Color = Rgb888, Error = Infallible>,
-        sample: AtmosphereSample,
     ) {
-        let co2_ppm = match sample.co2_ppm {
-            Some(v) => v,
+        let co2_ppm = match self.last_co2_ppm {
+            Some(v) => v.value,
             None => return,
         };
         let v = co2_ppm.round().clamp(0.0, f32::INFINITY) as u32;
@@ -294,16 +314,12 @@ impl Renderer {
             .expect("infallible");
     }
 
-    fn render_atmo(
-        &self,
-        aux: &mut impl DrawTarget<Color = Rgb888, Error = Infallible>,
-        sample: AtmosphereSample,
-    ) -> bool {
+    fn render_atmo(&self, aux: &mut impl DrawTarget<Color = Rgb888, Error = Infallible>) -> bool {
         // Order these from left to right;
         // but, each is fixed-width and right-anchored (by the unit marker).
         // We leave space at the end of each string for the next to overwrite.
-        if let Some(rh) = sample.relative_humidity {
-            let temp_fmt = format!("{rh:>3.0}%   ");
+        if let Some(rh) = self.last_relative_humidity {
+            let temp_fmt = format!("{:>3.0}%   ", rh.value);
             let humid_style = MonoTextStyle::new(&FONT_4X6, Rgb888::CYAN);
             let style = TextStyleBuilder::new()
                 .alignment(Alignment::Right)
@@ -316,8 +332,8 @@ impl Renderer {
                 .expect("infallible");
         }
 
-        if let Some(temp) = sample.temperature {
-            let temp_fmt = format!("{temp:>2.0}C");
+        if let Some(temp) = self.last_temperature {
+            let temp_fmt = format!("{:>2.0}C", temp.value);
             // TODO: Reflect heat / cool with color
             let temp_style = MonoTextStyle::new(&FONT_4X6, Rgb888::WHITE);
             let style = TextStyleBuilder::new()
@@ -330,9 +346,9 @@ impl Renderer {
                 .expect("infallible");
         }
 
-        sample.temperature.is_some()
-            || sample.relative_humidity.is_some()
-            || sample.co2_ppm.is_some()
+        self.last_temperature.is_some()
+            || self.last_relative_humidity.is_some()
+            || self.last_co2_ppm.is_some()
     }
 }
 

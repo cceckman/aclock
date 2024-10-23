@@ -1,3 +1,4 @@
 target/
-server
-server.gz
+*.bin
+*.gz
+

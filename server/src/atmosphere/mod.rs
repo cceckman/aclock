@@ -24,6 +24,25 @@ pub struct AtmosphereSample {
     pub co2_ppm: Option<f32>,
 }
 
+/// A historical measurement, timestamped.
+#[derive(Copy, Clone, Debug)]
+pub struct LastMeasurement {
+    pub at: DateTime<Utc>,
+    pub value: f32,
+}
+
+impl LastMeasurement {
+    pub fn update(old: &mut Option<LastMeasurement>, time: DateTime<Utc>, new: Option<f32>) {
+        let new = new.map(|value| LastMeasurement { at: time, value });
+        *old = match (*old, new) {
+            (Some(o), Some(new)) => Some(if new.at > o.at { new } else { o }),
+            (Some(o), None) => Some(o),
+            (None, Some(new)) => Some(new),
+            _ => None,
+        }
+    }
+}
+
 /// A type that can get local atmospheric conditions.
 pub trait AtmosphereSampler {
     /// Get a current / latest sample of atmospheric conditions.
@@ -61,17 +80,23 @@ where
     I: embedded_hal::i2c::I2c<SevenBitAddress>,
 {
     fn sample(&mut self) -> AtmosphereSample {
-        if let Ok(s) = self.sample() {
-            AtmosphereSample {
+        match self.sample() {
+            Ok(s) => AtmosphereSample {
                 timestamp: Utc::now(),
                 temperature: Some(s.temperature),
                 relative_humidity: Some(s.humidity),
                 co2_ppm: Some(s.co2),
-            }
-        } else {
-            AtmosphereSample {
-                timestamp: Utc::now(),
-                ..Default::default()
+            },
+            Err(e) => {
+                if let scd30::Error::NotReady() = e {
+                    tracing::debug!("scd30 not ready with new sample");
+                } else {
+                    tracing::warn!("error in communicating with scd30: {:?}", e);
+                }
+                AtmosphereSample {
+                    timestamp: Utc::now(),
+                    ..Default::default()
+                }
             }
         }
     }
