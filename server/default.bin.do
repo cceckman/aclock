@@ -13,7 +13,7 @@ else
 fi
 
 cargo build --release $TARGET --message-format=json --no-default-features \
-| jq -r 'select(.target.name == "server") | select(.executable) | .executable' \
+| jq -r "select(.target.name == \"$2\") | select(.executable) | .executable" \
 >"$3"
 
 OUTPUT="$(cat "$3")"

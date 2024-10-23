@@ -1,3 +1,3 @@
-rm -f server server.gz
+rm -f *.bin *.gz
 cargo clean
 
