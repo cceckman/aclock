@@ -14,9 +14,9 @@ fi
 
 
 # Build normally first, to show errors in the stderr stream
-cargo build --release $TARGET --no-default-features
+cargo build --release $TARGET --no-default-features --features=hardware
 
-cargo build --release $TARGET --message-format=json --no-default-features \
+cargo build --release $TARGET --message-format=json --no-default-features --features=hardware \
 | jq -r "select(.target.name == \"$2\") | select(.executable) | .executable" \
 >"$3"
 

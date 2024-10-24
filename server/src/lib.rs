@@ -10,6 +10,9 @@
 //!
 use std::{convert::Infallible, f32::consts::PI};
 
+#[cfg(feature = "web")]
+pub mod web;
+
 pub mod context;
 pub mod riseset;
 
@@ -17,6 +20,8 @@ pub mod riseset;
 pub mod simulator;
 
 pub mod atmosphere;
+
+#[cfg(feature = "hardware")]
 pub mod led_displays;
 
 use embedded_graphics::{
