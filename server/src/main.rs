@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use chrono::Local;
-use server::{context::Context, Renderer};
+use server::{context::Context, Renderer, RendererSettings};
 
 fn main() {
     tracing_subscriber::fmt::init();
@@ -17,16 +17,31 @@ fn main() {
     }
 
     #[cfg(feature = "simulator")]
-    let mut displays = server::simulator::SimDisplays::new();
+    let (mut displays, mut atmo) = {
+        tracing::info!("using simulated hardware");
+        (
+            server::simulator::SimDisplays::new(),
+            server::atmosphere::NullAtmosphereSampler {},
+        )
+    };
 
     #[cfg(not(feature = "simulator"))]
-    let mut displays = server::led_displays::LedDisplays::new().unwrap();
+    let (mut displays, mut atmo) = {
+        use linux_embedded_hal::I2cdev;
+        let device = I2cdev::new("/dev/i2c-1").expect("could not open i2c device");
+        let atmo = scd30::SCD30::new(device, scd30::SCD30Settings::default()).unwrap();
+        let displays = server::led_displays::LedDisplays::new().unwrap();
 
-    let renderer = Renderer::default();
+        (displays, atmo)
+    };
+
+    let mut renderer: Renderer = RendererSettings::default().into();
+
+    // let mut atmo = NullAtmosphereSampler {};
     while !ctx.is_cancelled() {
         let t = Local::now();
         tracing::info!("rendering clock at {}", t);
-        renderer.render(&mut displays, t);
+        renderer.render(&mut displays, &mut atmo, t);
 
         // Sleep until _almost_ the next second.
         let frac = (1000 - t.timestamp_subsec_millis()) as i32;

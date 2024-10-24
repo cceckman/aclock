@@ -7,7 +7,7 @@ use std::{
 };
 
 use chrono::{DateTime, Local};
-use server::{context::Context, Renderer};
+use server::{atmosphere::FakeAtmosphereSampler, context::Context, Renderer, RendererSettings};
 use tempfile::NamedTempFile;
 
 /// Make screen samples starting from the start time, stepping by the duration, and put them in the
@@ -24,7 +24,11 @@ fn make_samples(
     outdir: &Path,
 ) {
     let mut displays = server::simulator::SimDisplays::new_hidden();
-    let renderer = Renderer::default();
+    let mut renderer: Renderer = RendererSettings {
+        display_cycles: 2,
+        ..RendererSettings::default()
+    }
+    .into();
 
     let end = when.end;
 
@@ -34,7 +38,15 @@ fn make_samples(
         if t > end || ctx.is_cancelled() {
             break;
         }
-        renderer.render(&mut displays, t);
+        let mut atmo = FakeAtmosphereSampler {
+            sample: server::atmosphere::AtmosphereSample {
+                timestamp: t.into(),
+                temperature: Some((j % 100) as f32),
+                relative_humidity: Some((i as f32).sin() * 50.0 + 50.0),
+                co2_ppm: Some(1500.0 * ((j as f32).sin() + 1.0)),
+            },
+        };
+        renderer.render(&mut displays, &mut atmo, t);
         let buffer = displays.screenshot();
 
         let path = outdir.join(format!("{i:04}.png"));

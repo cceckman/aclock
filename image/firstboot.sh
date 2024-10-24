@@ -5,6 +5,10 @@ set -e
 
 raspi-config nonint do_change_timezone "America/New_York"
 raspi-config nonint do_change_locale "en_US.UTF-8 UTF-8"
+raspi-config nonint do_wifi_country "US"
+# 0 is enable!
+raspi-config nonint do_i2c 0
+raspi-config nonint do_ssh 0
 
 while ! test -d /home/cceckman/
 do

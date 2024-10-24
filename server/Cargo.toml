@@ -16,6 +16,9 @@ rs_ws281x = "0.5.1"
 tempfile = { version = "3.13.0", optional = true }
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
+scd30 = { path = "../scd30/" }
+linux-embedded-hal = { version = "^0.4", default-features = false, features = ["i2c", "i2cdev"] }
+embedded-hal = "^1"
 
 [target.'cfg(target_arch="aarch64")'.dependencies]
 rpi-led-matrix = {version = "0.4.0", features = ["embeddedgraphics"]}
@@ -24,9 +27,16 @@ rpi-led-matrix = {version = "0.4.0", features = ["embeddedgraphics"]}
 rpi-led-matrix = {version = "0.4.0", features = ["c-stubs", "embeddedgraphics"]}
 
 [features]
+# Enables the simulator output and disables the LED display output.
 simulator = ["dep:embedded-graphics-simulator"]
-default = ["video"]
+# Enables generating video output from the simulator.
 video = ["simulator", "dep:tempfile", "dep:num_cpus"]
+
+# Enables downloading atmospheric data from US government sources:
+# National Weather Service, AirNow, ...
+atmo-usgov = []
+
+default = ["video", "atmo-usgov"]
 
 [[bin]]
 name = "video"
