@@ -37,7 +37,7 @@ rpi-led-matrix = {version = "0.4.0", features = ["c-stubs", "embeddedgraphics"],
 hardware = ["dep:num_cpus", "dep:rs_ws281x", "dep:linux-embedded-hal", "dep:embedded-hal", "dep:scd30" , "dep:rpi-led-matrix", "dep:ctrlc"]
 
 # Enables the simulator output and disables the LED display output.
-simulator = ["dep:embedded-graphics-simulator"]
+simulator = ["dep:embedded-graphics-simulator", "dep:ctrlc"]
 # Enables generating video output from the simulator.
 video = ["simulator", "dep:tempfile", "dep:num_cpus"]
 
