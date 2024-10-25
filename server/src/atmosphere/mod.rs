@@ -61,6 +61,7 @@ impl AtmosphereSampler for NullAtmosphereSampler {
 }
 
 /// Fake atmosphere sampler: repeatedly provides the indicated sample.
+#[derive(Default)]
 pub struct FakeAtmosphereSampler {
     pub sample: AtmosphereSample,
 }

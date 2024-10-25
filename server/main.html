@@ -1,0 +1,37 @@
+<html>
+    <head>
+
+    </head>
+    <body>
+    <script type="module">
+        import init, { add} from "./pkg/server.js";
+        async function run() {
+            await init();
+        };
+        run();
+    /*
+
+          .then(() => {
+        const canvas = document.getElementById("life-canvas");
+        const canvasContext = canvas.getContext("2d");
+
+        const u = Universe.new(canvas.width, canvas.height);
+        u.randomize(BigInt(0xf));
+
+        const renderLoop = () => {
+          u.render2d(canvasContext);
+          u.tick();
+
+          // Target 5 FPS
+          setTimeout(() => {
+            requestAnimationFrame(renderLoop);
+
+          }, 1000 / 5)
+        };
+        requestAnimationFrame(renderLoop);
+      });
+      */
+    </script>
+
+    </body>
+</html>

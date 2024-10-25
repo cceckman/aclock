@@ -21,6 +21,8 @@ pub mod simulator;
 
 pub mod atmosphere;
 
+pub(crate) mod drawing;
+
 #[cfg(feature = "hardware")]
 pub mod led_displays;
 
@@ -64,6 +66,7 @@ pub trait Displays {
 }
 
 /// Provides the core rendering setting(s).
+#[cfg_attr(feature = "web", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct RendererSettings {
     /// Minimum edge pixel brightness during daylight
     pub min_daylight: f32,

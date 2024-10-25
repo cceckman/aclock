@@ -14,10 +14,13 @@ fi
 
 
 # Build normally first, to show errors in the stderr stream
-cargo build --release $TARGET --no-default-features --features=hardware
-
-cargo build --release $TARGET --message-format=json --no-default-features --features=hardware \
-| jq -r "select(.target.name == \"$2\") | select(.executable) | .executable" \
+cargo build --release $TARGET \
+    --no-default-features --features=hardware \
+    --bin hardware
+cargo build --release $TARGET --message-format=json \
+    --no-default-features --features=hardware \
+    --bin hardware \
+| jq -r "select(.target.name == \"hardware\") | select(.executable) | .executable" \
 >"$3"
 
 OUTPUT="$(cat "$3")"

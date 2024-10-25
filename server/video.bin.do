@@ -20,7 +20,7 @@ cargo build --release $TARGET \
 cargo build --release $TARGET \
     --no-default-features --features=video \
     --message-format=json  \
-| jq -r "select(.target.name == \"$2\") | select(.executable) | .executable" \
+| jq -r "select(.target.name == \"video\") | select(.executable) | .executable" \
 >"$3"
 
 OUTPUT="$(cat "$3")"
