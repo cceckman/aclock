@@ -22,7 +22,7 @@ tracing-subscriber = "0.3.18"
 scd30 = { path = "../scd30/", optional = true }
 linux-embedded-hal = { version = "^0.4", default-features = false, features = ["i2c", "i2cdev"], optional = true }
 embedded-hal = { version = "^1", optional = true }
-web-sys = { version = "0.3.72", optional = true, features = ["CanvasRenderingContext2d", "ImageData", "console"] }
+web-sys = { version = "0.3.72", optional = true, features = ["CanvasRenderingContext2d", "ImageData", "console", "HtmlInputElement", "HtmlCanvasElement"] }
 wasm-bindgen = { version = "0.2.95", optional = true }
 js-sys = { version = "0.3.72", optional = true }
 

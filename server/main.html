@@ -42,7 +42,7 @@
 <input type="number" disabled id="longitude" name="longitude" min="-180.0" max="180.0" value="-77.0353" />
 
 <label for="speedup">Simulation seconds per second: </label>
-<input type="range" disabled id="speedup" name="speedup" min="1" max="86400" value="1" />
+<input type="number" disabled id="speedup" name="speedup" min="1" max="86400" value="60" />
 
 <label for="scale">Scale: </label>
 <input type="range" disabled id="scale" name="scale" min="1" max="40" value="10" />
@@ -52,7 +52,7 @@
 <p id="js-warning">If you see this message, the simulator code hasn't loaded yet. Sorry!</p>
 
 <script type="module">
-import init, { new_web_renderer, RendererSettings} from "./pkg/server.js";
+import init, { WebRenderer } from "./pkg/server.js";
 
 function unlock() {
   const elements = document.querySelectorAll(".aclock-sim input");
@@ -60,36 +60,75 @@ function unlock() {
     element.disabled = false;
   }
   const warning = document.querySelector("#js-warning");
-  warning.parent.removeChild(warning);
+  warning.parentElement.removeChild(warning);
 }
 
 async function start() {
   await init();
 
   let scale = document.querySelector("#scale");
+  let speedup = document.querySelector("#speedup");
+  // TODO properly pass in lat/lon, not options at the moment
   let latitude = document.querySelector("#latitude");
   let longitude = document.querySelector("#longitude");
   let datetime = document.querySelector("#now");
   let tz = document.querySelector("#tz");
 
   const canvas = document.createElement("canvas");
-  canvas.height = 20 * scale.value;
-  canvas.width = 36 * scale.value;
   let ctx = canvas.getContext("2d");
 
-  let rs = new RendererSettings();
-  latitude.value = rs.latitude;
-  longitude.value = rs.longitude;
+  let wr = new WebRenderer();
+  function update() {
+      wr.update(canvas, datetime, tz, scale, null, null, null);
+  }
+  function canvas_update() {
+      canvas.height = 20 * scale.value;
+      canvas.width = 36 * scale.value;
+      update();
+  }
 
-  let wr = new_web_renderer(scale, rs, ctx);
-  wr.update(now.value + tz.value, 1000, 24, 50);
+  scale.addEventListener("change", canvas_update);
+  latitude.addEventListener("change", update);
+  longitude.addEventListener("change", update);
+  datetime.addEventListener("change", update);
+  tz.addEventListener("change", update);
+  canvas_update();
 
-    // TODO animation; advance time
-    // TODO hooks for parameter updates
+  let seconds = 0;
+  let ticker = null;
+  /// Call this once per second for simulation:
+  function tick() {
+    console.log("triggering tick");
+    try{
+        seconds += parseInt(speedup.value);
+        if (seconds >= 60) {
+            console.log(datetime.value);
+            const stamp = Date.parse(datetime.value); // returns millisecond epoch timestamp
+            let date = (new Date());
+            date.setTime(stamp + seconds * 1000);
+            seconds = seconds % 60;
+
+            // We have to do something silly to get from Date to datetime-local:
+            // https://stackoverflow.com/questions/30166338/setting-value-of-datetime-local-from-date
+            // Sadly, not something that was co-designed, it appears.
+            date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+            datetime.value = date.toISOString().slice(0,16);
+        }
+        update();
+    } catch(e) {
+        console.log(e);
+        if(ticker !== null) {
+          clearInterval(ticker);
+        }
+    }
+  };
+
   const img = document.querySelector("img#sim");
   if(img) {
     img.replaceWith(canvas);
   }
+  unlock();
+  ticker = setInterval(tick, 1000);
 }
 await start();
 

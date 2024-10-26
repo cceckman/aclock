@@ -134,9 +134,13 @@ impl Renderer {
         D: Displays,
         A: AtmosphereSampler,
     {
+        tracing::debug!("rendering edge");
         self.render_edge(displays, now.clone());
+        tracing::debug!("rendering face");
         self.render_face(displays, atmosphere, now.clone());
+        tracing::debug!("flushing displays");
         displays.flush().expect("failed to render to output");
+        tracing::debug!("completed frame");
     }
 
     fn render_edge<Tz, D>(&self, displays: &mut D, now: DateTime<Tz>)

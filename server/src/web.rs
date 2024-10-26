@@ -1,6 +1,6 @@
-use std::{convert::Infallible, str::FromStr};
+use std::{convert::Infallible, mem::swap, str::FromStr};
 
-use chrono::NaiveDateTime;
+use chrono::{DateTime, FixedOffset, MappedLocalTime, NaiveDateTime, TimeDelta, TimeZone, Utc};
 use embedded_graphics::{
     pixelcolor::Rgb888,
     prelude::{DrawTarget, DrawTargetExt, OriginDimensions, Point, RgbColor, Size},
@@ -10,57 +10,145 @@ use embedded_graphics::{
 /// Set up logging for the WASM simulator.
 use log::MakeConsoleWriter;
 use wasm_bindgen::prelude::*;
-use web_sys::CanvasRenderingContext2d;
+use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, HtmlInputElement};
 
 use crate::{
-    atmosphere::{AtmosphereSample, FakeAtmosphereSampler},
+    atmosphere::{AtmosphereSample, AtmosphereSampler},
     drawing::render_edge,
     Displays, NeoPixelColor, Renderer, RendererSettings,
 };
+
+const DEFAULT_SIZE: Size = Size::new(32, 16);
+
+/// Inputs from the browser context.
+///
+/// This is not public because we can't (apparently) pass JS elements from WASM objects.
+/// Selectors for HTML elements.
+/// We can't (apparently) store JS elements in WASM objects.
+struct WebInputs {
+    time: HtmlInputElement,
+    tz: HtmlInputElement,
+    co2: Option<HtmlInputElement>,
+    temperature: Option<HtmlInputElement>,
+    humidity: Option<HtmlInputElement>,
+}
+
+impl WebInputs {
+    /// Read the current time.
+    fn get_time(&self) -> Result<DateTime<FixedOffset>, String> {
+        // NaiveDateTime takes seconds, datetime-local provides 1-minute granularity
+        let naive = NaiveDateTime::from_str(&(self.time.value() + ":00")).map_err(|e| {
+            format!(
+                "error in timestamp {}: format error: {}",
+                self.time.value(),
+                e
+            )
+        })?;
+        let tz = self.tz.value();
+        let tz_offset: TimeDelta = {
+            let int_err = |e| format!("invalid timezone offset {}: {}", tz, e);
+            let str_err = |e| format!("invalid timezone offset {}: {}", tz, e);
+
+            if let Some((tz_h, tz_m)) = tz.split_once(":") {
+                let tz_h: i64 = tz_h.parse().map_err(int_err)?;
+                let tz_m: i64 = tz_m.parse().map_err(int_err)?;
+                let tz_m = if tz_h.signum() != 0 {
+                    tz_m * tz_h.signum()
+                } else {
+                    tz_m
+                };
+                let tz_h =
+                    TimeDelta::try_hours(tz_h).ok_or_else(|| str_err("overflow in hours"))?;
+                let tz_m =
+                    TimeDelta::try_hours(tz_m).ok_or_else(|| str_err("overflow in minutes"))?;
+                tz_h + tz_m
+            } else {
+                let off: i64 = tz.parse().map_err(int_err)?;
+                TimeDelta::try_hours(off).ok_or_else(|| str_err("overflow in hours"))?
+            }
+        };
+        let tz = FixedOffset::east_opt(tz_offset.num_seconds() as i32)
+            .ok_or_else(|| "invalid timezone offset ".to_owned() + &tz)?;
+        match tz.from_local_datetime(&naive) {
+            MappedLocalTime::Single(local) => Ok(local),
+            MappedLocalTime::Ambiguous(a, b) => {
+                tracing::info!("in mapping imestamp {} with UTC offset {} to absolute (UTC) time: could be {} or {}, assuming the former", self.time.value(), tz, a, b);
+                Ok(b)
+            }
+            MappedLocalTime::None => {
+                let msg = format!("in mapping imestamp {} with UTC offset {} to absolute (UTC) time: no possible result!", self.time.value(), tz);
+                tracing::error!(msg);
+                Err(msg)
+            }
+        }
+    }
+}
+
+impl AtmosphereSampler for WebInputs {
+    fn sample(&mut self) -> AtmosphereSample {
+        let timestamp = self.get_time().unwrap_or_default();
+        let parse = |v: &HtmlInputElement| v.value().parse().ok();
+        let co2_ppm: Option<f32> = self.co2.as_ref().and_then(parse);
+        let temperature: Option<f32> = self.temperature.as_ref().and_then(parse);
+        let relative_humidity: Option<f32> = self.humidity.as_ref().and_then(parse);
+
+        AtmosphereSample {
+            timestamp: timestamp.to_utc(),
+            co2_ppm,
+            temperature,
+            relative_humidity,
+        }
+    }
+}
 
 /// Renderer that renders to a web display.
 #[wasm_bindgen]
 #[allow(unused)]
 pub struct WebRenderer {
     renderer: Renderer,
-    displays: WebDisplays,
-    atmo: FakeAtmosphereSampler,
 }
 
 #[wasm_bindgen]
-pub fn new_web_renderer(
-    scale: i32,
-    settings: RendererSettings,
-    canvas: CanvasRenderingContext2d,
-) -> WebRenderer {
-    let renderer: Renderer = settings.into();
-    WebRenderer {
-        renderer,
-        displays: WebDisplays::new(scale, canvas),
-        atmo: FakeAtmosphereSampler::default(),
+impl WebRenderer {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> WebRenderer {
+        WebRenderer {
+            renderer: RendererSettings::default().into(),
+        }
     }
 }
 
 #[wasm_bindgen]
 impl WebRenderer {
-    #[wasm_bindgen]
-    pub fn update(&mut self, time: &str, co2: f64, temperature: f64, humidity: f64) {
-        let time = match NaiveDateTime::from_str(time) {
-            Ok(v) => v,
-            Err(e) => {
-                tracing::error!("{}", e);
-                return;
-            }
-        }
-        .and_utc();
-        self.atmo.sample = AtmosphereSample {
-            timestamp: time,
-            temperature: Some(temperature as f32),
-            relative_humidity: Some(humidity as f32),
-            co2_ppm: Some(co2 as f32),
+    // TODO: Allow mutating location
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "passing a lot of items over ABI boundary; temporary"
+    )]
+    pub fn update(
+        &mut self,
+        canvas: HtmlCanvasElement,
+        time: HtmlInputElement,
+        tz: HtmlInputElement,
+        scale: HtmlInputElement,
+        co2: Option<HtmlInputElement>,
+        temperature: Option<HtmlInputElement>,
+        humidity: Option<HtmlInputElement>,
+    ) -> Result<(), String> {
+        let mut inputs = WebInputs {
+            time,
+            tz,
+            co2,
+            temperature,
+            humidity,
         };
-        self.renderer
-            .render(&mut self.displays, &mut self.atmo, time);
+        let canvas = CanvasTarget::new(scale, canvas)?;
+        let mut displays = WebDisplays::new(canvas);
+        let time = inputs.get_time()?;
+
+        self.renderer.render(&mut displays, &mut inputs, time);
+
+        Ok(())
     }
 }
 
@@ -79,9 +167,27 @@ fn run() {
 /// TODO: Draw edge pixels as arcs rather than squares.
 /// We don't have the embedded-graphics constraints on web.
 struct CanvasTarget {
-    scale: i32,
     size: Size,
-    canvas: CanvasRenderingContext2d,
+    scale: i32,
+    canvas: HtmlCanvasElement,
+}
+
+impl CanvasTarget {
+    fn new(scale: HtmlInputElement, canvas: HtmlCanvasElement) -> Result<Self, String> {
+        let scale: u32 = scale
+            .value()
+            .parse()
+            .map_err(|e| format!("invalid scale: {}", e))?;
+        if !(1..4096).contains(&scale) {
+            // Arbitrary choice of max.
+            return Err(format!("invalid scale (out of range): {}", scale));
+        }
+        Ok(CanvasTarget {
+            scale: scale as i32,
+            size: DEFAULT_SIZE + Size::new(4, 4),
+            canvas,
+        })
+    }
 }
 
 impl OriginDimensions for CanvasTarget {
@@ -99,6 +205,14 @@ impl DrawTarget for CanvasTarget {
     where
         I: IntoIterator<Item = Pixel<Self::Color>>,
     {
+        tracing::info!("drawing to canvas");
+        let canvas = self
+            .canvas
+            .get_context("2d")
+            .expect("failed to get canvas rendering context")
+            .expect("unwraped empty canvas rendering object")
+            .dyn_into::<CanvasRenderingContext2d>()
+            .expect("canvas rendering context was not the expected type");
         // Keep a 1-slot cache of color strings, as we're likely to get swaths of the same color
         // repeatedly.
         let mut last_fill_color: Rgb888 = Rgb888::new(0, 0, 0);
@@ -109,14 +223,15 @@ impl DrawTarget for CanvasTarget {
                 last_fill_style = fill_color(color);
                 last_fill_color = color;
             }
-            self.canvas.set_fill_style_str(&last_fill_style);
-            self.canvas.rect(
-                pt.x as f64,
-                pt.y as f64,
-                (pt.x + self.scale) as f64,
-                (pt.y + self.scale) as f64,
+            canvas.set_fill_style_str(&last_fill_style);
+            canvas.fill_rect(
+                (pt.x * self.scale) as f64,
+                (pt.y * self.scale) as f64,
+                self.scale as f64,
+                self.scale as f64,
             );
         }
+        tracing::info!("drawing to canvas");
         Ok(())
     }
 }
@@ -129,17 +244,16 @@ struct WebDisplays {
 }
 
 impl WebDisplays {
-    fn new(scale: i32, canvas: CanvasRenderingContext2d) -> Self {
+    fn new(canvas: CanvasTarget) -> Self {
+        // TODO: Render the central matrix as dots (circles, with space).
+        // TODO: Render the edge as arcs.
+        // OK to emulate the SDL version for now.
         // 2 pixels on each edge; get the perimeter
         let perimeter = ((32 + 4) + (16 + 4)) * 2;
         let mut edge = Vec::new();
         edge.resize(perimeter, [0, 0, 0, 0]);
         WebDisplays {
-            canvas: CanvasTarget {
-                scale,
-                canvas,
-                size: Size::new(36, 20),
-            },
+            canvas,
             display: Vec::new(),
             edge,
         }
@@ -166,6 +280,7 @@ impl DrawTarget for &mut WebDisplays {
     where
         I: IntoIterator<Item = embedded_graphics::Pixel<Self::Color>>,
     {
+        tracing::trace!("drawing to inner matrix");
         self.display.extend(pixels);
 
         Ok(())
@@ -187,22 +302,24 @@ impl Displays for WebDisplays {
     }
 
     fn flush(&mut self) -> Result<(), String> {
-        // Clear the previous image:
+        tracing::trace!("clearning canvas");
         self.canvas.clear(Rgb888::new(0, 0, 0)).expect("infallible");
 
         // Draw the border:
         render_edge(&self.edge, &mut self.canvas);
 
+        // Draw the middle:
         let pixels = {
-            let mut new = Vec::with_capacity(self.display.len());
-            std::mem::swap(&mut self.display, &mut new);
-            new
+            let mut alt = Vec::new();
+            swap(&mut alt, &mut self.display);
+            alt
         };
+
         // Cropped translates; clipped ensures that OOB writes get dropped.
         let mut crop = self
             .canvas
-            .cropped(&Rectangle::new(Point::new(2, 2), Size::new(32, 16)));
-        let mut clip = crop.clipped(&Rectangle::new(Point::new(0, 0), Size::new(32, 16)));
+            .cropped(&Rectangle::new(Point::new(2, 2), DEFAULT_SIZE));
+        let mut clip = crop.clipped(&Rectangle::new(Point::new(0, 0), DEFAULT_SIZE));
         clip.draw_iter(pixels).expect("infallible");
 
         Ok(())
