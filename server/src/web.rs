@@ -28,7 +28,7 @@ pub struct WebRenderer {
 }
 
 #[wasm_bindgen]
-pub fn new_web_render(
+pub fn new_web_renderer(
     scale: i32,
     settings: RendererSettings,
     canvas: CanvasRenderingContext2d,
@@ -41,7 +41,9 @@ pub fn new_web_render(
     }
 }
 
+#[wasm_bindgen]
 impl WebRenderer {
+    #[wasm_bindgen]
     pub fn update(&mut self, time: &str, co2: f64, temperature: f64, humidity: f64) {
         let time = match NaiveDateTime::from_str(time) {
             Ok(v) => v,
@@ -74,7 +76,8 @@ fn run() {
 
 /// DrawTarget implementation for a web canvas.
 ///
-/// TODO: Extract this to its own crate?
+/// TODO: Draw edge pixels as arcs rather than squares.
+/// We don't have the embedded-graphics constraints on web.
 struct CanvasTarget {
     scale: i32,
     size: Size,

@@ -1,14 +1,102 @@
 <html>
     <head>
+        <title>aclock demo</title>
+<style>
 
+.aclock-sim {
+    background-color: var(--textbg-color-alt);
+    border-radius: var(--border-radius);
+
+    padding: calc(var(--border-radius) * 2);
+}
+
+.aclock-sim>* {
+    margin-left: auto;
+    margin-right: auto;
+    margin-top: calc(var(--border-radius) * 2);
+    margin-bottom: calc(var(--border-radius) * 2);
+}
+
+
+#sim {
+    display: block;
+}
+        </style>
     </head>
     <body>
+
+<div class="aclock-sim">
+
+<img id="sim" src="../year-example.webp" />
+
+<form>
+
+<input type="datetime-local" id="now" name="now" disabled value="2024-11-05T08:00" />
+
+<label for="tz">UTC offset:</label>
+<input type="number" disabled id="tz" name="tz" enabled=false value="-4" />
+
+<label for="latitude">Latitude: </label>
+<input type="number" disabled id="latitude" name="latitude" min="-90.0" max="90.0" value="38.8895" />
+<label for="longitude">Longitude: </label>
+<input type="number" disabled id="longitude" name="longitude" min="-180.0" max="180.0" value="-77.0353" />
+
+<label for="speedup">Simulation seconds per second: </label>
+<input type="range" disabled id="speedup" name="speedup" min="1" max="86400" value="1" />
+
+<label for="scale">Scale: </label>
+<input type="range" disabled id="scale" name="scale" min="1" max="40" value="10" />
+
+</form>
+
+<p id="js-warning">If you see this message, the simulator code hasn't loaded yet. Sorry!</p>
+
+<script type="module">
+import init, { new_web_renderer, RendererSettings} from "./pkg/server.js";
+
+function unlock() {
+  const elements = document.querySelectorAll(".aclock-sim input");
+  for (const element of elements) {
+    element.disabled = false;
+  }
+  const warning = document.querySelector("#js-warning");
+  warning.parent.removeChild(warning);
+}
+
+async function start() {
+  await init();
+
+  let scale = document.querySelector("#scale");
+  let latitude = document.querySelector("#latitude");
+  let longitude = document.querySelector("#longitude");
+  let datetime = document.querySelector("#now");
+  let tz = document.querySelector("#tz");
+
+  const canvas = document.createElement("canvas");
+  canvas.height = 20 * scale.value;
+  canvas.width = 36 * scale.value;
+  let ctx = canvas.getContext("2d");
+
+  let rs = new RendererSettings();
+  latitude.value = rs.latitude;
+  longitude.value = rs.longitude;
+
+  let wr = new_web_renderer(scale, rs, ctx);
+  wr.update(now.value + tz.value, 1000, 24, 50);
+
+    // TODO animation; advance time
+    // TODO hooks for parameter updates
+  const img = document.querySelector("img#sim");
+  if(img) {
+    img.replaceWith(canvas);
+  }
+}
+await start();
+
+</script>
+
+
     <script type="module">
-        import init, { add} from "./pkg/server.js";
-        async function run() {
-            await init();
-        };
-        run();
     /*
 
           .then(() => {

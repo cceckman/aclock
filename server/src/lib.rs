@@ -67,6 +67,7 @@ pub trait Displays {
 
 /// Provides the core rendering setting(s).
 #[cfg_attr(feature = "web", wasm_bindgen::prelude::wasm_bindgen)]
+#[derive(Copy, Clone)]
 pub struct RendererSettings {
     /// Minimum edge pixel brightness during daylight
     pub min_daylight: f32,
@@ -100,6 +101,14 @@ impl From<RendererSettings> for Renderer {
             last_co2_ppm: None,
             last_temperature: None,
         }
+    }
+}
+
+#[cfg_attr(feature = "web", wasm_bindgen::prelude::wasm_bindgen)]
+impl RendererSettings {
+    #[cfg_attr(feature = "web", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn new() -> Self {
+        Self::default()
     }
 }
 
