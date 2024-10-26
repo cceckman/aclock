@@ -26,6 +26,13 @@ use std::f32::consts::PI;
 
 use chrono::{DateTime, Datelike, Duration, NaiveDateTime, NaiveTime, Timelike};
 
+/// WASM-friendly version of the rise/noon/set computations.
+#[cfg_attr(feature = "web", wasm_bindgen::prelude::wasm_bindgen)]
+pub fn riseset_utc(date: &str, latitude: f32, longitude: f32) -> Result<String, String> {
+    todo!() // start here tomorrow
+}
+
+/// Compute sun rise/noon/set times.
 pub fn riseset<T: chrono::TimeZone>(
     date: DateTime<T>,
     latitude: f32,
@@ -64,6 +71,9 @@ pub fn riseset<T: chrono::TimeZone>(
 
         // We diverge from the PDF here and use the spreadsheet's form:
         // rise and set are computed as a difference from solar noon.
+        // TODO: Is this giving the right answer under WASM?
+        // See https://github.com/ssmichael1/satkit/issues/3-
+        // also showing discontinuities, under WASM only.
         let ha = (zenith.cos() / (lat.cos() * decl.cos()) - lat.tan() * decl.tan()).acos();
 
         let snoon = 720.0 - 4.0 * longitude - eqtime;
