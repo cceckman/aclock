@@ -41,3 +41,6 @@ default = ["video", "atmo-usgov"]
 [[bin]]
 name = "video"
 required-features = ["video"]
+
+[[bin]]
+name = "brightness"
