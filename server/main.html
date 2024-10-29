@@ -1,0 +1,182 @@
+<html>
+    <head>
+        <title>aclock demo</title>
+<style>
+
+.aclock-sim {
+    background-color: var(--textbg-color-alt);
+    border-radius: var(--border-radius);
+
+    padding: calc(var(--border-radius) * 2);
+    width: fit-content;
+}
+.aclock-sim form {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.aclock-sim canvas, .aclock-sim img {
+    margin: 10px;
+    display: block;
+}
+
+.aclock-sim #now {
+    grid-column: 1 / span 2;
+}
+.aclock-sim input {
+    text-align: right;
+}
+        </style>
+    </head>
+    <body>
+
+<div class="aclock-sim">
+
+<img id="sim" src="../year-example.webp" />
+
+<form>
+
+<input type="datetime-local" id="now" name="now" disabled value="2024-11-05T08:00" />
+
+<label for="tz">UTC offset:</label>
+<input type="number" disabled id="tz" name="tz" enabled=false value="-4" />
+
+<label for="latitude">Latitude: </label>
+<input type="number" disabled id="latitude" name="latitude" min="-90.0" max="90.0" value="38.8895" />
+<label for="longitude">Longitude: </label>
+<input type="number" disabled id="longitude" name="longitude" min="-180.0" max="180.0" value="-77.0353" />
+
+<label for="speedup">Speed (s/s): </label>
+<input type="number" disabled id="speedup" name="speedup" min="1" max="86400" value="60" />
+
+<label for="scale">Scale: </label>
+<input type="range" disabled id="scale" name="scale" min="1" max="40" value="10" />
+
+</form>
+
+<p id="js-warning">If you see this message, the simulator code hasn't loaded yet. Sorry!</p>
+
+<script type="module">
+import init, { WebRenderer } from "./pkg/server.js";
+
+function unlock() {
+  const elements = document.querySelectorAll(".aclock-sim input");
+  for (const element of elements) {
+    element.disabled = false;
+  }
+  const warning = document.querySelector("#js-warning");
+  warning.parentElement.removeChild(warning);
+}
+
+async function start() {
+  await init();
+
+  let scale = document.querySelector("#scale");
+  let speedup = document.querySelector("#speedup");
+  // TODO properly pass in lat/lon, not options at the moment
+  let latitude = document.querySelector("#latitude");
+  let longitude = document.querySelector("#longitude");
+  let datetime = document.querySelector("#now");
+  let tz = document.querySelector("#tz");
+
+  const canvas = document.createElement("canvas");
+  let ctx = canvas.getContext("2d");
+
+  let wr = new WebRenderer();
+  function update() {
+      wr.update(canvas, datetime, tz, scale, null, null, null);
+  }
+  function canvas_update() {
+      canvas.height = 20 * scale.value;
+      canvas.width = 36 * scale.value;
+      update();
+  }
+
+  scale.addEventListener("change", canvas_update);
+  latitude.addEventListener("change", update);
+  longitude.addEventListener("change", update);
+  datetime.addEventListener("change", update);
+  tz.addEventListener("change", update);
+  canvas_update();
+
+  let fractional_millis = 0.0;
+  let millis = 0.0;
+  let ticker = null;
+  let last_frame_timestamp = document.timeline.currentTime;
+  /// Call this once per second for simulation:
+  function tick(timestamp) {
+    const elapsed_millis = timestamp - last_frame_timestamp;
+    last_frame_timestamp = timestamp;
+
+    // Advance the simulated clock by the real clock
+    const sim_seconds_per_second = parseInt(speedup.value.trim()) * 1.0;
+    if(isNaN(sim_seconds_per_second)) {
+        console.log("skipping frame, no valid increment");
+    } else {
+        // The seconds-per-second and millis-per-millis ratios are the same.
+        const sim_elapsed_millis = elapsed_millis * sim_seconds_per_second;
+        fractional_millis += sim_elapsed_millis;
+        if(isNaN(fractional_millis)) {
+            console.log("NaN in fractional clock ; oops?");
+            fractional_millis = 0;
+        }
+        if (fractional_millis >= 60 * 1000) {
+            const stamp = Date.parse(datetime.value); // returns a millisecond-precision epoch timestamp
+            let date = (new Date());
+            date.setTime(stamp + fractional_millis);
+            fractional_millis = fractional_millis % (60 * 1000);
+
+            // We have to do something silly to get from Date to datetime-local:
+            // https://stackoverflow.com/questions/30166338/setting-value-of-datetime-local-from-date
+            // Sadly, not something that was co-designed, it appears.
+            date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+            datetime.value = date.toISOString().slice(0,16);
+            update();
+        }
+    }
+
+    ticker = requestAnimationFrame(tick);
+  };
+
+  const img = document.querySelector("img#sim");
+  if(img) {
+    img.replaceWith(canvas);
+  }
+  unlock();
+  ticker = requestAnimationFrame(tick);
+}
+await start();
+
+</script>
+
+
+    <script type="module">
+    /*
+
+          .then(() => {
+        const canvas = document.getElementById("life-canvas");
+        const canvasContext = canvas.getContext("2d");
+
+        const u = Universe.new(canvas.width, canvas.height);
+        u.randomize(BigInt(0xf));
+
+        const renderLoop = () => {
+          u.render2d(canvasContext);
+          u.tick();
+
+          // Target 5 FPS
+          setTimeout(() => {
+            requestAnimationFrame(renderLoop);
+
+          }, 1000 / 5)
+        };
+        requestAnimationFrame(renderLoop);
+      });
+      */
+    </script>
+
+    </body>
+</html>

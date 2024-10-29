@@ -10,6 +10,9 @@
 //!
 use std::{convert::Infallible, f32::consts::PI};
 
+#[cfg(feature = "web")]
+pub mod web;
+
 pub mod context;
 pub mod riseset;
 
@@ -17,6 +20,10 @@ pub mod riseset;
 pub mod simulator;
 
 pub mod atmosphere;
+
+pub(crate) mod drawing;
+
+#[cfg(feature = "hardware")]
 pub mod led_displays;
 
 use embedded_graphics::{
@@ -59,6 +66,8 @@ pub trait Displays {
 }
 
 /// Provides the core rendering setting(s).
+#[cfg_attr(feature = "web", wasm_bindgen::prelude::wasm_bindgen)]
+#[derive(Copy, Clone)]
 pub struct RendererSettings {
     /// Minimum edge pixel brightness during daylight
     pub min_daylight: f32,
@@ -95,6 +104,14 @@ impl From<RendererSettings> for Renderer {
     }
 }
 
+#[cfg_attr(feature = "web", wasm_bindgen::prelude::wasm_bindgen)]
+impl RendererSettings {
+    #[cfg_attr(feature = "web", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
 impl Default for RendererSettings {
     fn default() -> Self {
         const DEFAULT_MIN_DAYLIGHT: f32 = 0.2;
@@ -117,9 +134,13 @@ impl Renderer {
         D: Displays,
         A: AtmosphereSampler,
     {
+        tracing::debug!("rendering edge");
         self.render_edge(displays, now.clone());
+        tracing::debug!("rendering face");
         self.render_face(displays, atmosphere, now.clone());
+        tracing::debug!("flushing displays");
         displays.flush().expect("failed to render to output");
+        tracing::debug!("completed frame");
     }
 
     fn render_edge<Tz, D>(&self, displays: &mut D, now: DateTime<Tz>)
@@ -136,8 +157,12 @@ impl Renderer {
         //}
 
         // Wilmington, DE
-        let (rise, _noon, set) =
-            riseset::riseset(now, self.settings.latitude, self.settings.longitude);
+        let (rise, _noon, set) = riseset::riseset(
+            now.date_naive(),
+            self.settings.latitude,
+            self.settings.longitude,
+            now.timezone(),
+        );
 
         // Convert both of them to coordinates around the face.
         let [rise, set] = [rise, set].map(|v: DateTime<Tz>| {

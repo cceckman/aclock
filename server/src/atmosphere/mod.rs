@@ -1,7 +1,6 @@
 //! Types for surfacing atmospheric data.
 
 use chrono::{DateTime, Utc};
-use embedded_hal::i2c::SevenBitAddress;
 
 /// A sample of local atmospheric conditions.
 ///
@@ -61,10 +60,8 @@ impl AtmosphereSampler for NullAtmosphereSampler {
     }
 }
 
-#[cfg(feature = "atmo-usgov")]
-pub mod usgov;
-
 /// Fake atmosphere sampler: repeatedly provides the indicated sample.
+#[derive(Default)]
 pub struct FakeAtmosphereSampler {
     pub sample: AtmosphereSample,
 }
@@ -75,27 +72,36 @@ impl AtmosphereSampler for FakeAtmosphereSampler {
     }
 }
 
-impl<I> AtmosphereSampler for scd30::SCD30<I>
-where
-    I: embedded_hal::i2c::I2c<SevenBitAddress>,
-{
-    fn sample(&mut self) -> AtmosphereSample {
-        match self.sample() {
-            Ok(s) => AtmosphereSample {
-                timestamp: Utc::now(),
-                temperature: Some(s.temperature),
-                relative_humidity: Some(s.humidity),
-                co2_ppm: Some(s.co2),
-            },
-            Err(e) => {
-                if let scd30::Error::NotReady() = e {
-                    tracing::debug!("scd30 not ready with new sample");
-                } else {
-                    tracing::warn!("error in communicating with scd30: {:?}", e);
-                }
-                AtmosphereSample {
+#[cfg(feature = "hardware")]
+mod scd30 {
+    use chrono::Utc;
+    use embedded_hal::i2c::SevenBitAddress;
+    use scd30::SCD30;
+
+    use super::{AtmosphereSample, AtmosphereSampler};
+
+    impl<I> AtmosphereSampler for SCD30<I>
+    where
+        I: embedded_hal::i2c::I2c<SevenBitAddress>,
+    {
+        fn sample(&mut self) -> AtmosphereSample {
+            match self.sample() {
+                Ok(s) => AtmosphereSample {
                     timestamp: Utc::now(),
-                    ..Default::default()
+                    temperature: Some(s.temperature),
+                    relative_humidity: Some(s.humidity),
+                    co2_ppm: Some(s.co2),
+                },
+                Err(e) => {
+                    if let scd30::Error::NotReady() = e {
+                        tracing::debug!("scd30 not ready with new sample");
+                    } else {
+                        tracing::warn!("error in communicating with scd30: {:?}", e);
+                    }
+                    AtmosphereSample {
+                        timestamp: Utc::now(),
+                        ..Default::default()
+                    }
                 }
             }
         }
