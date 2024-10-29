@@ -52,21 +52,8 @@
 <p id="js-warning">If you see this message, the simulator code hasn't loaded yet. Sorry!</p>
 
 <script type="module">
-import init, { WebRenderer , ephemerides } from "./pkg/server.js";
+import init, { WebRenderer } from "./pkg/server.js";
 
-async function run() {
-    console.log("starting init");
-    await init();
-
-    let eph = ephemerides();
-    let out = document.createElement("pre");
-    out.innerText = ephemerides(39.0, -77.0);
-    document.querySelector("div.aclock-sim").replaceWith(out);
-}
-
-await run();
-
-/*
 function unlock() {
   const elements = document.querySelectorAll(".aclock-sim input");
   for (const element of elements) {
@@ -107,33 +94,43 @@ async function start() {
   tz.addEventListener("change", update);
   canvas_update();
 
-  let seconds = 0;
+  let fractional_millis = 0.0;
+  let millis = 0.0;
   let ticker = null;
+  let last_frame_timestamp = document.timeline.currentTime;
   /// Call this once per second for simulation:
-  function tick() {
-    console.log("triggering tick");
-    try{
-        seconds += parseInt(speedup.value);
-        if (seconds >= 60) {
-            console.log(datetime.value);
-            const stamp = Date.parse(datetime.value); // returns millisecond epoch timestamp
+  function tick(timestamp) {
+    const elapsed_millis = timestamp - last_frame_timestamp;
+    last_frame_timestamp = timestamp;
+
+    // Advance the simulated clock by the real clock
+    const sim_seconds_per_second = parseInt(speedup.value.trim()) * 1.0;
+    if(isNaN(sim_seconds_per_second)) {
+        console.log("skipping frame, no valid increment");
+    } else {
+        // The seconds-per-second and millis-per-millis ratios are the same.
+        const sim_elapsed_millis = elapsed_millis * sim_seconds_per_second;
+        fractional_millis += sim_elapsed_millis;
+        if(isNaN(fractional_millis)) {
+            console.log("NaN in fractional clock ; oops?");
+            fractional_millis = 0;
+        }
+        if (fractional_millis >= 60 * 1000) {
+            const stamp = Date.parse(datetime.value); // returns a millisecond-precision epoch timestamp
             let date = (new Date());
-            date.setTime(stamp + seconds * 1000);
-            seconds = seconds % 60;
+            date.setTime(stamp + fractional_millis);
+            fractional_millis = fractional_millis % (60 * 1000);
 
             // We have to do something silly to get from Date to datetime-local:
             // https://stackoverflow.com/questions/30166338/setting-value-of-datetime-local-from-date
             // Sadly, not something that was co-designed, it appears.
             date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
             datetime.value = date.toISOString().slice(0,16);
-        }
-        update();
-    } catch(e) {
-        console.log(e);
-        if(ticker !== null) {
-          clearInterval(ticker);
+            update();
         }
     }
+
+    ticker = requestAnimationFrame(tick);
   };
 
   const img = document.querySelector("img#sim");
@@ -141,11 +138,9 @@ async function start() {
     img.replaceWith(canvas);
   }
   unlock();
-  ticker = setInterval(tick, 1000);
+  ticker = requestAnimationFrame(tick);
 }
 await start();
-*/
-
 
 </script>
 

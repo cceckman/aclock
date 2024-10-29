@@ -27,6 +27,9 @@ use std::f32::consts::PI;
 use chrono::{DateTime, Datelike, Duration, Local, NaiveDate, NaiveDateTime, NaiveTime, TimeZone};
 
 /// Compute the next year's rise and set times.
+/// Usees the local timezone and the current time.
+///
+/// This is mostly useful for debugging.
 #[cfg_attr(feature = "web", wasm_bindgen::prelude::wasm_bindgen)]
 pub fn ephemerides(latitude: f64, longitude: f64) -> String {
     let day = Local::now();
