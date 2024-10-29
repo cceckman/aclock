@@ -1,6 +1,6 @@
 use std::{convert::Infallible, mem::swap, str::FromStr};
 
-use chrono::{DateTime, FixedOffset, MappedLocalTime, NaiveDateTime, TimeDelta, TimeZone, Utc};
+use chrono::{DateTime, FixedOffset, MappedLocalTime, NaiveDateTime, TimeDelta, TimeZone};
 use embedded_graphics::{
     pixelcolor::Rgb888,
     prelude::{DrawTarget, DrawTargetExt, OriginDimensions, Point, RgbColor, Size},

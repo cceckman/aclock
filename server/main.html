@@ -52,8 +52,21 @@
 <p id="js-warning">If you see this message, the simulator code hasn't loaded yet. Sorry!</p>
 
 <script type="module">
-import init, { WebRenderer } from "./pkg/server.js";
+import init, { WebRenderer , ephemerides } from "./pkg/server.js";
 
+async function run() {
+    console.log("starting init");
+    await init();
+
+    let eph = ephemerides();
+    let out = document.createElement("pre");
+    out.innerText = ephemerides(39.0, -77.0);
+    document.querySelector("div.aclock-sim").replaceWith(out);
+}
+
+await run();
+
+/*
 function unlock() {
   const elements = document.querySelectorAll(".aclock-sim input");
   for (const element of elements) {
@@ -131,6 +144,8 @@ async function start() {
   ticker = setInterval(tick, 1000);
 }
 await start();
+*/
+
 
 </script>
 

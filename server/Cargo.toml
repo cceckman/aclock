@@ -7,7 +7,7 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-chrono = { version = "0.4.38", features = ["clock", "std"], default-features = false }
+chrono = { version = "0.4.38", features = ["clock", "std", "wasmbind"], default-features = false }
 ctrlc = { version = "3.4.5", optional = true }
 # TODO:
 # Held back because rpi-led-matrix uses 0.3.3 specifically (!)

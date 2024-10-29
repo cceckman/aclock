@@ -157,8 +157,12 @@ impl Renderer {
         //}
 
         // Wilmington, DE
-        let (rise, _noon, set) =
-            riseset::riseset(now, self.settings.latitude, self.settings.longitude);
+        let (rise, _noon, set) = riseset::riseset(
+            now.date_naive(),
+            self.settings.latitude,
+            self.settings.longitude,
+            now.timezone(),
+        );
 
         // Convert both of them to coordinates around the face.
         let [rise, set] = [rise, set].map(|v: DateTime<Tz>| {

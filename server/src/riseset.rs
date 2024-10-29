@@ -24,19 +24,34 @@ V2: equation of time
 
 use std::f32::consts::PI;
 
-use chrono::{DateTime, Datelike, Duration, NaiveDateTime, NaiveTime, Timelike};
+use chrono::{DateTime, Datelike, Duration, Local, NaiveDate, NaiveDateTime, NaiveTime, TimeZone};
 
-/// WASM-friendly version of the rise/noon/set computations.
+/// Compute the next year's rise and set times.
 #[cfg_attr(feature = "web", wasm_bindgen::prelude::wasm_bindgen)]
-pub fn riseset_utc(date: &str, latitude: f32, longitude: f32) -> Result<String, String> {
-    todo!() // start here tomorrow
+pub fn ephemerides(latitude: f64, longitude: f64) -> String {
+    let day = Local::now();
+    let dates = day.naive_utc().date().iter_days();
+    let mut out = "".to_owned();
+    for date in dates.take(365) {
+        // tracing::info!("computing {}", date);
+        let (rise, noon, set) = riseset(date, latitude as f32, longitude as f32, Local);
+        out += &format!(
+            "{}: {} / {} / {}\n",
+            date,
+            rise.time(),
+            noon.time(),
+            set.time()
+        );
+    }
+    out
 }
 
 /// Compute sun rise/noon/set times.
-pub fn riseset<T: chrono::TimeZone>(
-    date: DateTime<T>,
+pub fn riseset<T: TimeZone>(
+    date: NaiveDate,
     latitude: f32,
     longitude: f32,
+    tz: T,
 ) -> (DateTime<T>, DateTime<T>, DateTime<T>) {
     let yr = date.year();
     // The NOAA equations produce rise and set times in minutes past UTC midnight.
@@ -47,8 +62,8 @@ pub fn riseset<T: chrono::TimeZone>(
 
         let days = if leap_year { 366 } else { 365 };
 
-        // Fractional year in radians
-        let ordinal_day = date.ordinal() - 1 + (date.hour() - 12) / 24;
+        // Fractional year in radians. We don't include a fractional day from the hour.
+        let ordinal_day = date.ordinal(); // - 1 + (date.hour() - 12) / 24;
         let gamma = (2.0 * PI) * (ordinal_day as f32) / (days as f32);
 
         // equation of time, relating mean solar time and true solar time
@@ -83,11 +98,10 @@ pub fn riseset<T: chrono::TimeZone>(
         (rise, snoon, set)
         // END OF NOAA EQUATIONS
     };
-    let just_date = date.naive_utc().date();
     let [rise, snoon, set] = [rise, snoon, set].map(|f| {
         let offset = Duration::seconds(f.round() as i64 * 60);
-        let d = NaiveDateTime::new(just_date, NaiveTime::MIN) + offset;
-        date.timezone().from_utc_datetime(&d)
+        let d = NaiveDateTime::new(date, NaiveTime::MIN) + offset;
+        tz.from_utc_datetime(&d)
     });
 
     (rise, snoon, set)
