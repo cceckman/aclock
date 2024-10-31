@@ -1,9 +1,12 @@
-///! Display implementation on LED screens.
+//! Display implementation on LED screens.
 use std::convert::Infallible;
 
 use crate::{Displays, NeoPixelColor};
-use embedded_graphics::pixelcolor::Rgb888;
-use rpi_led_matrix::{LedMatrix, LedMatrixOptions};
+use embedded_graphics::{
+    pixelcolor::Rgb888,
+    prelude::{Dimensions, DrawTarget},
+};
+use rpi_led_matrix::{LedCanvas, LedMatrix, LedMatrixOptions};
 use rs_ws281x::{ChannelBuilder, Controller, ControllerBuilder};
 
 /// Displays implementation for real hardware.
@@ -11,6 +14,30 @@ use rs_ws281x::{ChannelBuilder, Controller, ControllerBuilder};
 pub struct LedDisplays {
     strip: Controller,
     matrix: LedMatrix,
+    offscreen: Option<LedCanvas>,
+}
+
+struct OffscreenCanvas<'a> {
+    canvas: &'a mut LedCanvas,
+}
+
+impl Dimensions for OffscreenCanvas<'_> {
+    fn bounding_box(&self) -> embedded_graphics::primitives::Rectangle {
+        self.canvas.bounding_box()
+    }
+}
+
+impl DrawTarget for OffscreenCanvas<'_> {
+    type Color = Rgb888;
+
+    type Error = Infallible;
+
+    fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
+    where
+        I: IntoIterator<Item = embedded_graphics::Pixel<Self::Color>>,
+    {
+        self.canvas.draw_iter(pixels)
+    }
 }
 
 impl Displays for LedDisplays {
@@ -22,12 +49,18 @@ impl Displays for LedDisplays {
         &mut self,
     ) -> impl embedded_graphics_core::draw_target::DrawTarget<Color = Rgb888, Error = Infallible>
     {
-        self.matrix.offscreen_canvas()
+        if self.offscreen.is_none() {
+            self.offscreen = Some(self.matrix.offscreen_canvas());
+        }
+        OffscreenCanvas {
+            canvas: self.offscreen.as_mut().unwrap(),
+        }
     }
 
     fn flush(&mut self) -> Result<(), String> {
-        let off = self.matrix.offscreen_canvas();
-        let _ = self.matrix.swap(off);
+        if let Some(offscreen) = self.offscreen.take() {
+            self.offscreen = Some(self.matrix.swap(offscreen));
+        }
         self.strip.render().map_err(|e| e.to_string())
     }
 }
@@ -48,7 +81,11 @@ impl LedDisplays {
     pub fn new() -> Result<Self, String> {
         let strip = Self::new_controller()?;
         let matrix = Self::new_matrix()?;
-        Ok(Self { strip, matrix })
+        Ok(Self {
+            strip,
+            matrix,
+            offscreen: None,
+        })
     }
 
     fn new_controller() -> Result<Controller, String> {
