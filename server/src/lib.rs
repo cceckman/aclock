@@ -127,6 +127,11 @@ impl Default for RendererSettings {
 }
 
 impl Renderer {
+    /// Access the settings, for update purposes.
+    pub fn settings(&mut self) -> &mut RendererSettings {
+        &mut self.settings
+    }
+
     /// Update the displays with the current data.
     pub fn render<Tz, D, A>(&mut self, displays: &mut D, atmosphere: &mut A, now: DateTime<Tz>)
     where

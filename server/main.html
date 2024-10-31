@@ -76,7 +76,6 @@ async function start() {
 
   let scale = document.querySelector("#scale");
   let speedup = document.querySelector("#speedup");
-  // TODO properly pass in lat/lon, not options at the moment
   let latitude = document.querySelector("#latitude");
   let longitude = document.querySelector("#longitude");
   let datetime = document.querySelector("#now");
@@ -87,7 +86,7 @@ async function start() {
 
   let wr = new WebRenderer();
   function update() {
-      wr.update(canvas, datetime, tz, scale, null, null, null);
+      wr.update(canvas, datetime, tz, scale, latitude, longitude, null, null, null);
   }
   function canvas_update() {
       canvas.height = 20 * scale.value;

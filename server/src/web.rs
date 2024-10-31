@@ -9,7 +9,7 @@ use embedded_graphics::{
 };
 /// Set up logging for the WASM simulator.
 use log::MakeConsoleWriter;
-use wasm_bindgen::prelude::*;
+use wasm_bindgen::{convert::LongRefFromWasmAbi, prelude::*};
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, HtmlInputElement};
 
 use crate::{
@@ -118,12 +118,17 @@ impl WebRenderer {
     }
 }
 
+impl Default for WebRenderer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[wasm_bindgen]
 impl WebRenderer {
-    // TODO: Allow mutating location
     #[allow(
         clippy::too_many_arguments,
-        reason = "passing a lot of items over ABI boundary; temporary"
+        reason = "items are otherwise not passable over ABI boundary"
     )]
     pub fn update(
         &mut self,
@@ -131,10 +136,21 @@ impl WebRenderer {
         time: HtmlInputElement,
         tz: HtmlInputElement,
         scale: HtmlInputElement,
+        latitude: HtmlInputElement,
+        longitude: HtmlInputElement,
         co2: Option<HtmlInputElement>,
         temperature: Option<HtmlInputElement>,
         humidity: Option<HtmlInputElement>,
     ) -> Result<(), String> {
+        let latitude = latitude.value_as_number();
+        let longitude = longitude.value_as_number();
+        if (-90.0..90.0).contains(&latitude) {
+            self.renderer.settings().latitude = latitude as f32;
+        }
+        if (-180.0..180.0).contains(&latitude) {
+            self.renderer.settings().longitude = longitude as f32;
+        }
+
         let mut inputs = WebInputs {
             time,
             tz,

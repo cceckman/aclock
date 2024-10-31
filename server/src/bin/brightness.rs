@@ -34,7 +34,7 @@ pub fn main() {
     #[cfg(feature = "simulator")]
     let mut displays = server::simulator::SimDisplays::new();
 
-    #[cfg(not(feature = "simulator"))]
+    #[cfg(feature = "hardware")]
     let mut displays = server::led_displays::LedDisplays::new().unwrap();
 
     let ctx = Context::new();
