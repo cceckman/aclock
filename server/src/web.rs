@@ -1,20 +1,18 @@
-use std::{convert::Infallible, mem::swap, str::FromStr};
+use std::{convert::Infallible, f64::consts::PI, str::FromStr};
 
 use chrono::{DateTime, FixedOffset, MappedLocalTime, NaiveDateTime, TimeDelta, TimeZone};
 use embedded_graphics::{
     pixelcolor::Rgb888,
-    prelude::{DrawTarget, DrawTargetExt, OriginDimensions, Point, RgbColor, Size},
-    primitives::Rectangle,
+    prelude::{DrawTarget, OriginDimensions, RgbColor, Size},
     Pixel,
 };
 /// Set up logging for the WASM simulator.
 use log::MakeConsoleWriter;
-use wasm_bindgen::{convert::LongRefFromWasmAbi, prelude::*};
+use wasm_bindgen::prelude::*;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, HtmlInputElement};
 
 use crate::{
     atmosphere::{AtmosphereSample, AtmosphereSampler},
-    drawing::render_edge,
     Displays, NeoPixelColor, Renderer, RendererSettings,
 };
 
@@ -158,8 +156,8 @@ impl WebRenderer {
             temperature,
             humidity,
         };
-        let canvas = CanvasTarget::new(scale, canvas)?;
-        let mut displays = WebDisplays::new(canvas);
+        let mut displays = WebDisplays::new(scale, canvas)
+            .inspect_err(|e| tracing::error!("error in setting up displays: {}", e))?;
         let time = inputs.get_time()?;
 
         self.renderer.render(&mut displays, &mut inputs, time);
@@ -178,101 +176,36 @@ fn run() {
         .init();
 }
 
-/// DrawTarget implementation for a web canvas.
-///
-/// TODO: Draw edge pixels as arcs rather than squares.
-/// We don't have the embedded-graphics constraints on web.
-struct CanvasTarget {
-    size: Size,
-    scale: i32,
-    canvas: HtmlCanvasElement,
-}
-
-impl CanvasTarget {
-    fn new(scale: HtmlInputElement, canvas: HtmlCanvasElement) -> Result<Self, String> {
-        let scale: u32 = scale
-            .value()
-            .parse()
-            .map_err(|e| format!("invalid scale: {}", e))?;
-        if !(1..4096).contains(&scale) {
-            // Arbitrary choice of max.
-            return Err(format!("invalid scale (out of range): {}", scale));
-        }
-        Ok(CanvasTarget {
-            scale: scale as i32,
-            size: DEFAULT_SIZE + Size::new(4, 4),
-            canvas,
-        })
-    }
-}
-
-impl OriginDimensions for CanvasTarget {
-    fn size(&self) -> Size {
-        self.size
-    }
-}
-
-impl DrawTarget for CanvasTarget {
-    type Color = Rgb888;
-
-    type Error = Infallible;
-
-    fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
-    where
-        I: IntoIterator<Item = Pixel<Self::Color>>,
-    {
-        tracing::info!("drawing to canvas");
-        let canvas = self
-            .canvas
-            .get_context("2d")
-            .expect("failed to get canvas rendering context")
-            .expect("unwraped empty canvas rendering object")
-            .dyn_into::<CanvasRenderingContext2d>()
-            .expect("canvas rendering context was not the expected type");
-        // Keep a 1-slot cache of color strings, as we're likely to get swaths of the same color
-        // repeatedly.
-        let mut last_fill_color: Rgb888 = Rgb888::new(0, 0, 0);
-        let mut last_fill_style: String = fill_color(last_fill_color);
-
-        for Pixel(pt, color) in pixels.into_iter() {
-            if last_fill_color != color {
-                last_fill_style = fill_color(color);
-                last_fill_color = color;
-            }
-            canvas.set_fill_style_str(&last_fill_style);
-            canvas.fill_rect(
-                (pt.x * self.scale) as f64,
-                (pt.y * self.scale) as f64,
-                self.scale as f64,
-                self.scale as f64,
-            );
-        }
-        tracing::info!("drawing to canvas");
-        Ok(())
-    }
-}
-
 /// Displays implementation for a 2d canvas
 struct WebDisplays {
-    canvas: CanvasTarget,
+    canvas: HtmlCanvasElement,
+    scale: u32,
     display: Vec<Pixel<Rgb888>>,
     edge: Vec<NeoPixelColor>,
 }
 
 impl WebDisplays {
-    fn new(canvas: CanvasTarget) -> Self {
+    fn new(scale: HtmlInputElement, canvas: HtmlCanvasElement) -> Result<Self, String> {
+        let scale = scale.value_as_number();
+        // Must be at least 4 to allow spacing between matrix pixels.
+        if !(4.0..4096.0).contains(&scale) {
+            return Err(format!("invalid scale: {}", scale));
+        }
+        let scale = scale as u32;
+
         // TODO: Render the central matrix as dots (circles, with space).
         // TODO: Render the edge as arcs.
         // OK to emulate the SDL version for now.
         // 2 pixels on each edge; get the perimeter
-        let perimeter = ((32 + 4) + (16 + 4)) * 2;
+        let perimeter = 60;
         let mut edge = Vec::new();
         edge.resize(perimeter, [0, 0, 0, 0]);
-        WebDisplays {
+        Ok(WebDisplays {
             canvas,
+            scale,
             display: Vec::new(),
             edge,
-        }
+        })
     }
 }
 
@@ -296,9 +229,7 @@ impl DrawTarget for &mut WebDisplays {
     where
         I: IntoIterator<Item = embedded_graphics::Pixel<Self::Color>>,
     {
-        tracing::trace!("drawing to inner matrix");
         self.display.extend(pixels);
-
         Ok(())
     }
 }
@@ -319,24 +250,105 @@ impl Displays for WebDisplays {
 
     fn flush(&mut self) -> Result<(), String> {
         tracing::trace!("clearning canvas");
-        self.canvas.clear(Rgb888::new(0, 0, 0)).expect("infallible");
+        // Our drawing area is a nominal NxN with the matrix centered.
+        const SIM_MATRIX: u32 = 50;
+        let d = SIM_MATRIX * self.scale;
+        self.canvas.set_width(d);
+        self.canvas.set_height(d);
+        let center = d as f64 / 2.0;
 
-        // Draw the border:
-        render_edge(&self.edge, &mut self.canvas);
-
-        // Draw the middle:
-        let pixels = {
-            let mut alt = Vec::new();
-            swap(&mut alt, &mut self.display);
-            alt
-        };
-
-        // Cropped translates; clipped ensures that OOB writes get dropped.
-        let mut crop = self
+        let ctx = self
             .canvas
-            .cropped(&Rectangle::new(Point::new(2, 2), DEFAULT_SIZE));
-        let mut clip = crop.clipped(&Rectangle::new(Point::new(0, 0), DEFAULT_SIZE));
-        clip.draw_iter(pixels).expect("infallible");
+            .get_context("2d")
+            .map_err(|e| format!("could not obtain canvas context: {:?}", e))?
+            .ok_or_else(|| "obtained empty 2d context".to_owned())?
+            .dyn_into::<CanvasRenderingContext2d>()
+            .map_err(|e| format!("canvas rendering context was not a 2d context: {:?}", e))?;
+
+        ctx.clear_rect(0.0, 0.0, d as f64, d as f64);
+
+        let face_radius = ((SIM_MATRIX - 10) * self.scale) as f64 / 2.0;
+        {
+            let radius = d as f64 / 2.0;
+            // Draw the edge display:
+            let arc_size = 2.0 * PI / self.edge.len() as f64;
+            // Javascript by default measures arcs in clockwise radians? Eh?
+            const DOWN: f64 = PI / 2.0;
+            for (i, it) in self.edge.iter().enumerate() {
+                let start_angle = DOWN + (i as f64 * arc_size);
+                let end_angle = start_angle + arc_size;
+                let mid_angle = (start_angle + end_angle) / 2.0;
+
+                let (x_outer, y_outer) = (
+                    center + mid_angle.cos() * radius,
+                    center + mid_angle.sin() * radius,
+                );
+                let (x_inner, y_inner) = (
+                    center + mid_angle.cos() * face_radius,
+                    center + mid_angle.sin() * face_radius,
+                );
+
+                let gradient = ctx.create_linear_gradient(x_inner, y_inner, x_outer, y_outer);
+                gradient
+                    .add_color_stop(0.0, &fill_color(Rgb888::new(it[0], it[1], it[2])))
+                    .map_err(|e| format!("failed to stop gradient: {e:?}"))?;
+                gradient
+                    .add_color_stop(1.0, "black")
+                    .map_err(|e| format!("failed to stop gradient: {e:?}"))?;
+
+                // let fill = fill_color(Rgb888::WHITE);
+                // Begins a new path
+                ctx.begin_path();
+                ctx.move_to(center, center);
+                ctx.ellipse(center, center, radius, radius, 0.0, start_angle, end_angle)
+                    .map_err(|e| format!("could not draw edge arc: {e:?}"))?;
+                ctx.move_to(center, center);
+                ctx.close_path();
+                ctx.set_fill_style_canvas_gradient(&gradient);
+                ctx.fill();
+            }
+        }
+        // Draw an inner arc to mask off the face.
+        {
+            ctx.begin_path();
+            ctx.set_fill_style_str(&fill_color(Rgb888::BLACK));
+            ctx.ellipse(center, center, face_radius, face_radius, 0.0, 0.0, 2.0 * PI)
+                .map_err(|e| format!("could not draw center mask: {e:?}"))?;
+            ctx.close_path();
+            ctx.fill();
+        }
+        {
+            // Finally, draw each pixel in the matrix.
+            // We extend the matrix out to the full dimensions,
+            // and here compute the edges.
+            let matrix_offset_top = (SIM_MATRIX - DEFAULT_SIZE.height) / 2;
+            let matrix_offset_left = (SIM_MATRIX - DEFAULT_SIZE.width) / 2;
+            // Radius must be at least 1.
+            let r = std::cmp::max(self.scale / 4, 1) as f64;
+            // Since most colors will be the same, we only update the fill color if it changes.
+            let mut last_color = Rgb888::BLACK;
+            for Pixel(pt, color) in self.display.drain(0..) {
+                let (x, y) = (
+                    pt.x as u32 + matrix_offset_left,
+                    pt.y as u32 + matrix_offset_top,
+                );
+                let (x, y) = (x * self.scale, y * self.scale);
+                let (x, y) = (x as f64, y as f64);
+                ctx.begin_path();
+                ctx.move_to(x, y);
+                ctx.arc(x, y, r, 0.0, 2.0 * PI)
+                    .map_err(|e| format!("could not draw matrix pixel: {e:?}"))?;
+                ctx.close_path();
+
+                if color != last_color {
+                    ctx.set_fill_style_str(&fill_color(color));
+                    last_color = color;
+                }
+                ctx.fill();
+            }
+        }
+
+        tracing::trace!("done drawing frame");
 
         Ok(())
     }

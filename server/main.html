@@ -3,6 +3,11 @@
         <title>aclock demo</title>
 <style>
 
+body {
+    background: #000000;
+    color: #cccccc;
+}
+
 .aclock-sim {
     background-color: var(--textbg-color-alt);
     border-radius: var(--border-radius);
@@ -42,7 +47,7 @@
 <input type="datetime-local" id="now" name="now" disabled value="2024-11-05T08:00" />
 
 <label for="tz">UTC offset:</label>
-<input type="number" disabled id="tz" name="tz" enabled=false value="-4" />
+<input type="number" disabled id="tz" name="tz" enabled=false value="-5" />
 
 <label for="latitude">Latitude: </label>
 <input type="number" disabled id="latitude" name="latitude" min="-90.0" max="90.0" value="38.8895" />
