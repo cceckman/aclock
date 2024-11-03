@@ -2,21 +2,12 @@
 
 use embedded_graphics::{
     pixelcolor::Rgb888,
-    prelude::{Dimensions, DrawTarget, Point},
+    prelude::{Dimensions, DrawTarget, Point, RgbColor},
+    primitives::Rectangle,
     Pixel,
 };
 use server::{context::Context, Displays, NeoPixelColor};
-use std::time::Duration;
-
-fn face_color(state: &mut u8) -> Rgb888 {
-    *state = (*state + 1) % 4;
-    match state {
-        1 => Rgb888::new(255, 0, 0),
-        2 => Rgb888::new(0, 255, 0),
-        3 => Rgb888::new(0, 0, 255),
-        _ => Rgb888::new(255, 255, 255),
-    }
-}
+use std::{iter::once, time::Duration};
 
 fn edge_color(state: &mut u8) -> NeoPixelColor {
     *state = (*state + 1) % 5;
@@ -27,6 +18,16 @@ fn edge_color(state: &mut u8) -> NeoPixelColor {
         4 => [0, 0, 0, 255],
         _ => [255, 255, 255, 255],
     }
+}
+
+/// Generate an iterator over the pixels in the rectangle.
+fn points(area: Rectangle) -> impl Iterator<Item = Point> {
+    let xs = area.top_left.x..(area.top_left.x + area.size.width as i32);
+    let ys = area.top_left.y..(area.top_left.y + area.size.height as i32);
+    xs.flat_map(move |x| {
+        let ys = ys.clone();
+        ys.map(move |y| Point::new(x, y))
+    })
 }
 
 pub fn main() {
@@ -47,25 +48,22 @@ pub fn main() {
         .expect("could not set SIGINT handler");
     }
 
-    let mut face_channel = 0;
     let mut edge_channel = 0;
+    let mut face_channel = 0;
+    let mut face_color = std::iter::from_fn(move || {
+        let colors = [
+            Rgb888::WHITE,
+            Rgb888::RED,
+            Rgb888::GREEN,
+            Rgb888::BLUE,
+            Rgb888::BLACK,
+        ];
+        face_channel = (face_channel + 1) % colors.len();
+        Some(colors[face_channel])
+    });
 
     tracing::info!("starting loop");
     while !ctx.is_cancelled() {
-        {
-            let mut disp = displays.face();
-            let dims = disp.bounding_box();
-            let xs = dims.top_left.x..(dims.top_left.x + dims.size.width as i32);
-            let ys = dims.top_left.y..(dims.top_left.y + dims.size.height as i32);
-            let color = face_color(&mut face_channel);
-            let pixels = xs
-                .flat_map(|x| {
-                    let ys = ys.clone();
-                    ys.map(move |y| (x, y))
-                })
-                .map(|(x, y)| Pixel(Point::new(x, y), color));
-            disp.draw_iter(pixels).expect("infallible");
-        }
         {
             let color = edge_color(&mut edge_channel);
             for px in displays.edge() {
@@ -73,6 +71,29 @@ pub fn main() {
             }
         }
 
+        {
+            let face_color = face_color.next().expect("infallible");
+            let area = displays.face().bounding_box();
+            let pixels = points(area).map(|pt| Pixel(pt, face_color));
+            displays.face().draw_iter(pixels).expect("infallible");
+
+            if face_color == Rgb888::BLACK {
+                for pt in points(area) {
+                    displays
+                        .face()
+                        .draw_iter(once(Pixel(pt, Rgb888::WHITE)))
+                        .expect("infallible");
+                    displays.flush().expect("infallible");
+                    if ctx.wait_timeout(Duration::from_millis(10)) {
+                        break;
+                    }
+                    displays
+                        .face()
+                        .draw_iter(once(Pixel(pt, Rgb888::BLACK)))
+                        .expect("infallible");
+                }
+            }
+        }
         displays.flush().expect("infallible?");
         ctx.wait_timeout(Duration::from_secs(1));
     }
