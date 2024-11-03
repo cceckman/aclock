@@ -89,6 +89,9 @@ impl Displays for SimDisplays {
         render_edge(&self.edge, &mut self.display);
         if let Some(window) = &mut self.window {
             window.update(&self.display);
+            self.display
+                .clear(Rgb888::BLACK)
+                .map_err(|_| "infallible".to_owned())?;
         }
         // self.clear();
         Ok(())

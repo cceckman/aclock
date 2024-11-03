@@ -65,37 +65,36 @@ pub fn main() {
     tracing::info!("starting loop");
     while !ctx.is_cancelled() {
         {
-            let color = edge_color.next().expect("infalible");
+            let color = edge_color.next().expect("infallible");
             for px in displays.edge() {
                 *px = color;
             }
         }
 
-        {
-            let face_color = face_color.next().expect("infallible");
-            let area = displays.face().bounding_box();
-            let pixels = points(area).map(|pt| Pixel(pt, face_color));
-            displays.face().draw_iter(pixels).expect("infallible");
+        let face_color = face_color.next().expect("infallible");
+        let area = displays.face().bounding_box();
+        let pixels = points(area).map(|pt| Pixel(pt, face_color));
 
-            if face_color == Rgb888::BLACK {
-                for pt in points(area) {
-                    displays
-                        .face()
-                        .draw_iter(once(Pixel(pt, Rgb888::WHITE)))
-                        .expect("infallible");
-                    displays.flush().expect("infallible");
-                    if ctx.wait_timeout(Duration::from_millis(10)) {
-                        break;
-                    }
-                    displays
-                        .face()
-                        .draw_iter(once(Pixel(pt, Rgb888::BLACK)))
-                        .expect("infallible");
+        if face_color == Rgb888::BLACK {
+            for pt in points(area) {
+                displays
+                    .face()
+                    .draw_iter(once(Pixel(pt, Rgb888::WHITE)))
+                    .expect("infallible");
+                displays.flush().expect("infallible");
+                if ctx.wait_timeout(Duration::from_millis(10)) {
+                    break;
                 }
+                displays
+                    .face()
+                    .draw_iter(once(Pixel(pt, Rgb888::BLACK)))
+                    .expect("infallible");
             }
+        } else {
+            displays.face().draw_iter(pixels).expect("infallible");
+            displays.flush().expect("infallible?");
+            ctx.wait_timeout(Duration::from_secs(1));
         }
-        displays.flush().expect("infallible?");
-        ctx.wait_timeout(Duration::from_secs(1));
     }
     tracing::info!("exiting loop");
 }
