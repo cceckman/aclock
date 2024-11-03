@@ -288,12 +288,14 @@ impl Displays for WebDisplays {
                     center + mid_angle.sin() * face_radius,
                 );
 
+                let [r, g, b, _w] = *it;
                 let gradient = ctx.create_linear_gradient(x_inner, y_inner, x_outer, y_outer);
                 gradient
-                    .add_color_stop(0.0, &fill_color(Rgb888::new(it[0], it[1], it[2])))
+                    .add_color_stop(0.0, &fill_color(Rgb888::new(r, g, b)))
                     .map_err(|e| format!("failed to stop gradient: {e:?}"))?;
+                // Fade to transparent, i.e. the background:
                 gradient
-                    .add_color_stop(1.0, "black")
+                    .add_color_stop(1.0, &format!("rgba({r}, {g}, {b}, 0)"))
                     .map_err(|e| format!("failed to stop gradient: {e:?}"))?;
 
                 // let fill = fill_color(Rgb888::WHITE);
