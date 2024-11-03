@@ -59,7 +59,11 @@ impl Displays for LedDisplays {
 
     fn flush(&mut self) -> Result<(), String> {
         if let Some(offscreen) = self.offscreen.take() {
-            self.offscreen = Some(self.matrix.swap(offscreen));
+            self.offscreen = Some({
+                let mut off = self.matrix.swap(offscreen);
+                off.clear();
+                off
+            });
         }
         self.strip.render().map_err(|e| e.to_string())
     }
