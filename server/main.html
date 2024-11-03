@@ -35,7 +35,7 @@
 
 <div class="aclock-sim">
 
-<img id="sim" src="../year-example.webp" />
+<img id="sim" src="year-sim.webp" />
 
 <form>
 
@@ -86,7 +86,7 @@ async function start() {
 
   let wr = new WebRenderer();
   function update() {
-      wr.update(canvas, datetime, tz, scale, latitude, longitude, null, null, null);
+      let result = wr.update(canvas, datetime, tz, scale, latitude, longitude, null, null, null);
   }
   function canvas_update() {
       canvas.height = 20 * scale.value;
@@ -151,31 +151,7 @@ await start();
 
 </script>
 
-
-    <script type="module">
-    /*
-
-          .then(() => {
-        const canvas = document.getElementById("life-canvas");
-        const canvasContext = canvas.getContext("2d");
-
-        const u = Universe.new(canvas.width, canvas.height);
-        u.randomize(BigInt(0xf));
-
-        const renderLoop = () => {
-          u.render2d(canvasContext);
-          u.tick();
-
-          // Target 5 FPS
-          setTimeout(() => {
-            requestAnimationFrame(renderLoop);
-
-          }, 1000 / 5)
-        };
-        requestAnimationFrame(renderLoop);
-      });
-      */
-    </script>
+</div>
 
     </body>
 </html>
