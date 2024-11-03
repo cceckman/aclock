@@ -6,19 +6,8 @@ use embedded_graphics::{
     primitives::Rectangle,
     Pixel,
 };
-use server::{context::Context, Displays, NeoPixelColor};
+use server::{context::Context, Displays};
 use std::{iter::once, time::Duration};
-
-fn edge_color(state: &mut u8) -> NeoPixelColor {
-    *state = (*state + 1) % 5;
-    match state {
-        1 => [255, 0, 0, 0],
-        2 => [0, 255, 0, 0],
-        3 => [0, 0, 255, 0],
-        4 => [0, 0, 0, 255],
-        _ => [255, 255, 255, 255],
-    }
-}
 
 /// Generate an iterator over the pixels in the rectangle.
 fn points(area: Rectangle) -> impl Iterator<Item = Point> {
@@ -50,6 +39,17 @@ pub fn main() {
 
     let mut edge_channel = 0;
     let mut face_channel = 0;
+    let mut edge_color = std::iter::from_fn(move || {
+        let colors = [
+            [0, 0, 0, 255],
+            [255, 0, 0, 0],
+            [0, 255, 0, 0],
+            [0, 0, 255, 0],
+            [255, 255, 255, 255],
+        ];
+        edge_channel = (edge_channel + 1) % colors.len();
+        Some(colors[edge_channel])
+    });
     let mut face_color = std::iter::from_fn(move || {
         let colors = [
             Rgb888::WHITE,
@@ -65,7 +65,7 @@ pub fn main() {
     tracing::info!("starting loop");
     while !ctx.is_cancelled() {
         {
-            let color = edge_color(&mut edge_channel);
+            let color = edge_color.next().expect("infalible");
             for px in displays.edge() {
                 *px = color;
             }
