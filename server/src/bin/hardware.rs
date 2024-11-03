@@ -28,8 +28,9 @@ fn main() {
     #[cfg(not(feature = "simulator"))]
     let (mut displays, mut atmo) = {
         use linux_embedded_hal::I2cdev;
-        let device = I2cdev::new("/dev/i2c-1").expect("could not open i2c device");
-        let atmo = scd30::SCD30::new(device, scd30::SCD30Settings::default()).unwrap();
+        // let device = I2cdev::new("/dev/i2c-1").expect("could not open i2c device");
+        // let atmo = scd30::SCD30::new(device, scd30::SCD30Settings::default()).unwrap();
+        let atmo = server::atmosphere::NullAtmosphereSampler {};
         let displays = server::led_displays::LedDisplays::new().unwrap();
 
         (displays, atmo)
@@ -40,7 +41,7 @@ fn main() {
     // let mut atmo = NullAtmosphereSampler {};
     while !ctx.is_cancelled() {
         let t = Local::now();
-        tracing::info!("rendering clock at {}", t);
+        tracing::trace!("rendering clock at {}", t);
         renderer.render(&mut displays, &mut atmo, t);
 
         // Sleep until _almost_ the next second.

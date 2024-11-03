@@ -104,7 +104,7 @@ impl LedDisplays {
                     // Datasheet says RGBW, but this is what
                     // I've got.
                     .strip_type(rs_ws281x::StripType::Sk6812Gbrw)
-                    .brightness(100)
+                    .brightness(10)
                     .build(),
             )
             .build()
