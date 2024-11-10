@@ -49,6 +49,9 @@ disable_overscan=1
 # https://github.com/jgarff/rpi_ws281x?tab=readme-ov-file#spi
 core_freq=250
 
+# For aclock, ENABLE I2c RTC (DS1307)
+dtoverlay=i2c-rtc,ds1307
+
 [cm4]
 # Enable host mode on the 2711 built-in XHCI USB controller.
 # This line should be removed if the legacy DWC2 controller is required

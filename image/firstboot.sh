@@ -23,8 +23,11 @@ su cceckman -c "echo 'sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5
 # Set up WiFi before having anything to do with apt
 /opt/firstboot-wifi.sh
 
+# From the Adafruit rgb-matrix.sh script,
+# remove the fake-hwclock since we have a real-time clock
+
 # Recommended in
 # https://github.com/hzeller/rpi-rgb-led-matrix/tree/master?tab=readme-ov-file#use-minimal-raspbian-distribution
-apt-get remove -y bluez bluez-firmware pi-bluetooth triggerhappy pigpio
+apt-get remove -y bluez bluez-firmware pi-bluetooth triggerhappy pigpio fake-hwclock
 
 systemctl disable cce-firstboot
