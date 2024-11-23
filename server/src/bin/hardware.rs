@@ -1,7 +1,29 @@
 use std::time::Duration;
 
 use chrono::Local;
-use server::{context::Context, Renderer, RendererSettings};
+use linux_embedded_hal::I2cdev;
+use server::{
+    atmosphere::{AtmosphereSampler, NullAtmosphereSampler},
+    context::Context,
+    Renderer, RendererSettings,
+};
+
+fn get_i2c_atmosphere() -> Result<scd30::SCD30<I2cdev>, scd30::Error<linux_embedded_hal::I2CError>>
+{
+    let device = linux_embedded_hal::I2cdev::new("/dev/i2c-1").map_err(|e| {
+        tracing::error!("no device at /dev/i2c-1: {}", e);
+        scd30::Error::NotReady()
+    })?;
+    scd30::SCD30::new(device, scd30::SCD30Settings::default())
+}
+
+fn get_atmosphere() -> Box<dyn AtmosphereSampler> {
+    if let Ok(v) = get_i2c_atmosphere() {
+        Box::new(v)
+    } else {
+        Box::new(NullAtmosphereSampler {})
+    }
+}
 
 fn main() {
     tracing_subscriber::fmt::init();
@@ -17,24 +39,15 @@ fn main() {
     }
 
     #[cfg(feature = "simulator")]
-    let (mut displays, mut atmo) = {
-        tracing::info!("using simulated hardware");
-        (
-            server::simulator::SimDisplays::new(),
-            server::atmosphere::NullAtmosphereSampler {},
-        )
+    let mut displays = {
+        tracing::info!("using simulated displays");
+        server::simulator::SimDisplays::new()
     };
 
     #[cfg(not(feature = "simulator"))]
-    let (mut displays, mut atmo) = {
-        use linux_embedded_hal::I2cdev;
-        // let device = I2cdev::new("/dev/i2c-1").expect("could not open i2c device");
-        // let atmo = scd30::SCD30::new(device, scd30::SCD30Settings::default()).unwrap();
-        let atmo = server::atmosphere::NullAtmosphereSampler {};
-        let displays = server::led_displays::LedDisplays::new().unwrap();
+    let mut displays = server::led_displays::LedDisplays::new().unwrap();
 
-        (displays, atmo)
-    };
+    let mut atmo = get_atmosphere();
 
     let mut renderer: Renderer = RendererSettings::default().into();
 

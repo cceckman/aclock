@@ -23,6 +23,13 @@ pub struct AtmosphereSample {
     pub co2_ppm: Option<f32>,
 }
 
+// True object-oriented programming...
+impl AtmosphereSampler for Box<dyn AtmosphereSampler> {
+    fn sample(&mut self) -> AtmosphereSample {
+        self.as_mut().sample()
+    }
+}
+
 /// A historical measurement, timestamped.
 #[derive(Copy, Clone, Debug)]
 pub struct LastMeasurement {
