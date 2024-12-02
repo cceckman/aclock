@@ -40,6 +40,18 @@ fn main() {
         .expect("could not set SIGINT handler");
     }
 
+    // It looks like the matrix library calls setresgid/setresuid to become 'daemon'
+    // at some point (after its setup), but possibly in another thread
+    // (I'm *sometimes* getting success.)
+    //
+    // `daemon` doesn't have access to i2c. If we set up the matrix before the SCD30,
+    // we may lock ourselves out of access to /dev/i2c-1!
+    // So: keep the atmosphere setup before the matrix setup!
+    //
+    // This observation brought to you by *strace*, your friend in understanding what mysterious
+    // libraries are doing.
+    let mut atmo = get_atmosphere();
+
     #[cfg(feature = "simulator")]
     let mut displays = {
         tracing::info!("using simulated displays");
@@ -48,8 +60,6 @@ fn main() {
 
     #[cfg(not(feature = "simulator"))]
     let mut displays = server::led_displays::LedDisplays::new().unwrap();
-
-    let mut atmo = get_atmosphere();
 
     let mut renderer: Renderer = RendererSettings::default().into();
 
