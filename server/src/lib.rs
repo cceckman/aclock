@@ -270,53 +270,15 @@ impl Renderer {
                 .draw(&mut canvas)
                 .expect("infallible");
         }
-        let cycle_id = (self.display_cycle / self.settings.display_cycles) % 2;
-        self.display_cycle += 1;
         let aux_size = Size::new(32, 7);
         let mut aux_crop = canvas.cropped(&Rectangle::new(Point::new(0, 9), aux_size));
         let mut aux = aux_crop.clipped(&Rectangle::new(Point::new(0, 0), aux_size));
 
         self.update_atmo(atmosphere);
-        if cycle_id == 0 || !self.render_atmo(&mut aux) {
+        if !self.render_atmo(&mut aux) {
             // Fall back to rendering date
             self.render_date(&mut aux, time);
         }
-        self.render_co2_indicator(&mut aux);
-    }
-
-    /// Render a CO2 concentration indicator, if available.
-    ///
-    /// Renders the thousands place of the CO2 concentration, color-coded:
-    /// <1000 ppm: 0, green
-    /// 1000-2000: 1, yellow
-    /// 2000-9999: thousands place, red
-    /// 10000+   : !, red
-    fn render_co2_indicator(
-        &self,
-        canvas: &mut impl DrawTarget<Color = Rgb888, Error = Infallible>,
-    ) {
-        let co2_ppm = match self.last_co2_ppm {
-            Some(v) => v.value,
-            None => return,
-        };
-        let v = co2_ppm.round().clamp(0.0, f32::INFINITY) as u32;
-        let thou = v / 1000;
-        let (ch, color) = match thou {
-            0 => ('0', Rgb888::GREEN),
-            1 => ('1', Rgb888::YELLOW),
-            2..9 => (char::from_u32(thou + '0' as u32).unwrap(), Rgb888::RED),
-            _ => ('!', Rgb888::RED),
-        };
-        let s = format!("{}", ch);
-        let co2_style = MonoTextStyle::new(&FONT_4X6, color);
-        let style = TextStyleBuilder::new()
-            .alignment(Alignment::Left)
-            .baseline(Baseline::Top)
-            .build();
-
-        Text::with_text_style(&s, Point::new(0, 0), co2_style, style)
-            .draw(canvas)
-            .expect("infallible");
     }
 
     /// Render the date into the provided space.
@@ -345,40 +307,23 @@ impl Renderer {
     }
 
     fn render_atmo(&self, aux: &mut impl DrawTarget<Color = Rgb888, Error = Infallible>) -> bool {
-        // Order these from left to right;
-        // but, each is fixed-width and right-anchored (by the unit marker).
-        // We leave space at the end of each string for the next to overwrite.
-        if let Some(rh) = self.last_relative_humidity {
-            let temp_fmt = format!("{:>3.0}%   ", rh.value);
-            let humid_style = MonoTextStyle::new(&FONT_4X6, Rgb888::CYAN);
-            let style = TextStyleBuilder::new()
-                .alignment(Alignment::Right)
-                .baseline(Baseline::Top)
-                .build();
-
-            // 3 characters over from the right: 31 - (4 * 3)
-            Text::with_text_style(&temp_fmt, Point::new(31, 0), humid_style, style)
-                .draw(aux)
-                .expect("infallible");
-        }
-
-        if let Some(temp) = self.last_temperature {
-            let temp_fmt = format!("{:>2.0}C", temp.value);
-            // TODO: Reflect heat / cool with color
+        if let (Some(temp), Some(co2)) = (self.last_temperature, self.last_co2_ppm) {
+            // In a 4x6 font, we have (32/4=) 8characters to work with.
+            let s = format!("{:<2.0}C {:>4.0}", temp.value, co2.value);
             let temp_style = MonoTextStyle::new(&FONT_4X6, Rgb888::WHITE);
             let style = TextStyleBuilder::new()
                 .alignment(Alignment::Right)
                 .baseline(Baseline::Top)
                 .build();
 
-            Text::with_text_style(&temp_fmt, Point::new(31, 0), temp_style, style)
+            Text::with_text_style(&s, Point::new(31, 0), temp_style, style)
                 .draw(aux)
                 .expect("infallible");
-        }
 
-        self.last_temperature.is_some()
-            || self.last_relative_humidity.is_some()
-            || self.last_co2_ppm.is_some()
+            true
+        } else {
+            false
+        }
     }
 }
 

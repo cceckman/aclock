@@ -11,17 +11,19 @@ use server::{
 fn get_i2c_atmosphere() -> Result<scd30::SCD30<I2cdev>, scd30::Error<linux_embedded_hal::I2CError>>
 {
     let device = linux_embedded_hal::I2cdev::new("/dev/i2c-1").map_err(|e| {
-        tracing::error!("no device at /dev/i2c-1: {}", e);
+        tracing::error!("could not open device at /dev/i2c-1: {}", e);
         scd30::Error::NotReady()
     })?;
     scd30::SCD30::new(device, scd30::SCD30Settings::default())
 }
 
 fn get_atmosphere() -> Box<dyn AtmosphereSampler> {
-    if let Ok(v) = get_i2c_atmosphere() {
-        Box::new(v)
-    } else {
-        Box::new(NullAtmosphereSampler {})
+    match get_i2c_atmosphere() {
+        Ok(v) => Box::new(v),
+        Err(e) => {
+            tracing::error!("could not set up SCD20: {e}");
+            Box::new(NullAtmosphereSampler {})
+        }
     }
 }
 
