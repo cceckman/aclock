@@ -21,7 +21,7 @@ fn get_atmosphere() -> Box<dyn AtmosphereSampler> {
     match get_i2c_atmosphere() {
         Ok(v) => Box::new(v),
         Err(e) => {
-            tracing::error!("could not set up SCD20: {e}");
+            tracing::error!("could not set up SCD30: {e}");
             Box::new(NullAtmosphereSampler {})
         }
     }
