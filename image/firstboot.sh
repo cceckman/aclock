@@ -29,5 +29,8 @@ su cceckman -c "echo 'sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5
 # Recommended in
 # https://github.com/hzeller/rpi-rgb-led-matrix/tree/master?tab=readme-ov-file#use-minimal-raspbian-distribution
 apt-get remove -y bluez bluez-firmware pi-bluetooth triggerhappy pigpio fake-hwclock
+# https://learn.adafruit.com/adding-a-real-time-clock-to-raspberry-pi/set-rtc-time#sync-time-from-pi-to-rtc
+update-rc.d -f fake-hwclock remove
+systemctl disable --now fake-hwclock
 
 systemctl disable cce-firstboot
