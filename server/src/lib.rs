@@ -80,6 +80,11 @@ pub struct RendererSettings {
 
     /// How many cycles (frames) to display each piece of auxiliary data.
     pub display_cycles: usize,
+
+    /// Color to use for rendering the matrix.
+    pub matrix_r: u8,
+    pub matrix_g: u8,
+    pub matrix_b: u8,
 }
 
 /// State of a renderer.
@@ -112,6 +117,17 @@ impl RendererSettings {
     }
 }
 
+impl RendererSettings {
+    pub fn with_color(self, color: Rgb888) -> Self {
+        Self {
+            matrix_r: color.r(),
+            matrix_g: color.g(),
+            matrix_b: color.b(),
+            ..self
+        }
+    }
+}
+
 impl Default for RendererSettings {
     fn default() -> Self {
         const DEFAULT_MIN_DAYLIGHT: f32 = 0.2;
@@ -122,13 +138,16 @@ impl Default for RendererSettings {
             latitude: 39.0,
             longitude: -77.0,
             display_cycles: 60,
+            matrix_r: 255,
+            matrix_g: 255,
+            matrix_b: 255,
         }
     }
 }
 
 impl Renderer {
     /// Access the settings, for update purposes.
-    pub fn settings(&mut self) -> &mut RendererSettings {
+    pub fn settings_mut(&mut self) -> &mut RendererSettings {
         &mut self.settings
     }
 
@@ -146,6 +165,14 @@ impl Renderer {
         tracing::debug!("flushing displays");
         displays.flush().expect("failed to render to output");
         tracing::debug!("completed frame");
+    }
+
+    fn matrix_color(&self) -> Rgb888 {
+        Rgb888::new(
+            self.settings.matrix_r,
+            self.settings.matrix_g,
+            self.settings.matrix_b,
+        )
     }
 
     fn render_edge<Tz, D>(&self, displays: &mut D, now: DateTime<Tz>)
@@ -261,7 +288,7 @@ impl Renderer {
         // The time always goes into the upper half of the display;
         // auxiliary data into the bottom.
         {
-            let time_style = MonoTextStyle::new(&FONT_6X9, Rgb888::WHITE);
+            let time_style = MonoTextStyle::new(&FONT_6X9, self.matrix_color());
             let style = TextStyleBuilder::new()
                 .alignment(Alignment::Center)
                 .baseline(Baseline::Top)
@@ -295,7 +322,7 @@ impl Renderer {
             month_en3(time.month()),
             time.year() % 100
         );
-        let date_style = MonoTextStyle::new(&FONT_4X6, Rgb888::WHITE);
+        let date_style = MonoTextStyle::new(&FONT_4X6, self.matrix_color());
         let style = TextStyleBuilder::new()
             .alignment(Alignment::Right)
             .baseline(Baseline::Top)
@@ -307,10 +334,22 @@ impl Renderer {
     }
 
     fn render_atmo(&self, aux: &mut impl DrawTarget<Color = Rgb888, Error = Infallible>) -> bool {
-        if let (Some(temp), Some(co2)) = (self.last_temperature, self.last_co2_ppm) {
-            // In a 4x6 font, we have (32/4=) 8characters to work with.
-            let s = format!("{:<2.0}C {:>4.0}", temp.value, co2.value);
-            let temp_style = MonoTextStyle::new(&FONT_4X6, Rgb888::WHITE);
+        if let (Some(temp), Some(humid), Some(co2)) = (
+            self.last_temperature,
+            self.last_relative_humidity,
+            self.last_co2_ppm,
+        ) {
+            // In a 4x6 font, we have (32/4=) 8 characters to work with.
+            // 3 for temperature (NNC), four for CO2 (NNNN),
+            // and one in the middle for a box-drawing character of humidity.
+            const BAR: &[char] = &[' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+
+            // Consider 90% "full", this is supposed to be indoors.
+            let rh_symbol = f32::floor(humid.value * (BAR.len() as f32) / 90.0) as usize;
+            let v = BAR[rh_symbol];
+
+            let s = format!("{:<2.0}C{v}{:>4.0}", temp.value, co2.value);
+            let temp_style = MonoTextStyle::new(&FONT_4X6, self.matrix_color());
             let style = TextStyleBuilder::new()
                 .alignment(Alignment::Right)
                 .baseline(Baseline::Top)

@@ -143,10 +143,10 @@ impl WebRenderer {
         let latitude = latitude.value_as_number();
         let longitude = longitude.value_as_number();
         if (-90.0..90.0).contains(&latitude) {
-            self.renderer.settings().latitude = latitude as f32;
+            self.renderer.settings_mut().latitude = latitude as f32;
         }
         if (-180.0..180.0).contains(&latitude) {
-            self.renderer.settings().longitude = longitude as f32;
+            self.renderer.settings_mut().longitude = longitude as f32;
         }
 
         let mut inputs = WebInputs {

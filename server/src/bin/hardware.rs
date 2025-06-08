@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use chrono::Local;
+use embedded_graphics::pixelcolor::Rgb888;
 use linux_embedded_hal::I2cdev;
 use server::{
     atmosphere::{AtmosphereSampler, NullAtmosphereSampler},
@@ -61,7 +62,9 @@ fn main() {
     #[cfg(not(feature = "simulator"))]
     let mut displays = server::led_displays::LedDisplays::new().unwrap();
 
-    let mut renderer: Renderer = RendererSettings::default().into();
+    let mut renderer: Renderer = RendererSettings::default()
+        .with_color(Rgb888::new(255, 0, 0)) // Only the red channel actually shines through the wood
+        .into();
 
     // let mut atmo = NullAtmosphereSampler {};
     while !ctx.is_cancelled() {
