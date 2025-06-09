@@ -33,7 +33,7 @@ use embedded_graphics::{
         MonoTextStyle,
     },
     pixelcolor::RgbColor,
-    primitives::{Primitive, PrimitiveStyleBuilder, Rectangle},
+    primitives::{Primitive, PrimitiveStyleBuilder, Rectangle, StyledDrawable},
     text::{Alignment, Baseline, Text, TextStyleBuilder},
     Drawable,
 };
@@ -256,13 +256,23 @@ impl Renderer {
         A: AtmosphereSampler,
     {
         let s = atmosphere.sample();
-        LastMeasurement::update(&mut self.last_co2_ppm, s.timestamp, s.co2_ppm);
-        LastMeasurement::update(
+        let temp_update =
+            LastMeasurement::update(&mut self.last_temperature, s.timestamp, s.temperature);
+        let rh_update = LastMeasurement::update(
             &mut self.last_relative_humidity,
             s.timestamp,
             s.relative_humidity,
         );
-        LastMeasurement::update(&mut self.last_temperature, s.timestamp, s.temperature);
+        let co2_update = LastMeasurement::update(&mut self.last_co2_ppm, s.timestamp, s.co2_ppm);
+
+        if temp_update || rh_update || co2_update {
+            tracing::info!(
+                "new atomospheric reading: {} PPM CO2, {}% RH, {}°C",
+                s.co2_ppm.unwrap_or(0.0),
+                s.relative_humidity.unwrap_or(0.0),
+                s.temperature.unwrap_or(0.0),
+            )
+        }
     }
 
     fn render_face<Tz, D, A>(&mut self, displays: &mut D, atmosphere: &mut A, time: DateTime<Tz>)
@@ -334,35 +344,69 @@ impl Renderer {
     }
 
     fn render_atmo(&self, aux: &mut impl DrawTarget<Color = Rgb888, Error = Infallible>) -> bool {
-        if let (Some(temp), Some(humid), Some(co2)) = (
+        let (Some(temp), Some(humid), Some(co2)) = (
             self.last_temperature,
             self.last_relative_humidity,
             self.last_co2_ppm,
-        ) {
-            // In a 4x6 font, we have (32/4=) 8 characters to work with.
-            // 3 for temperature (NNC), four for CO2 (NNNN),
-            // and one in the middle for a box-drawing character of humidity.
-            const BAR: &[char] = &[' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+        ) else {
+            tracing::warn!(
+                "missing atmospheric data: temp? {} rh? {} co2? {}",
+                self.last_temperature.is_some(),
+                self.last_relative_humidity.is_some(),
+                self.last_co2_ppm.is_some()
+            );
+            return false;
+        };
+        // In a 4x6 font, we have (32/4=) 8 characters to work with.
+        // 3 for temperature (NNC), four for CO2 (NNNN),
+        // and a one-character space to render humidity into.
 
-            // Consider 90% "full", this is supposed to be indoors.
-            let rh_symbol = f32::floor(humid.value * (BAR.len() as f32) / 90.0) as usize;
-            let v = BAR[rh_symbol];
+        let s = format!("{:<2.0}C {:>4.0}", temp.value, co2.value);
+        let temp_style = MonoTextStyle::new(&FONT_4X6, self.matrix_color());
+        let style = TextStyleBuilder::new()
+            .alignment(Alignment::Right)
+            .baseline(Baseline::Bottom)
+            .build();
 
-            let s = format!("{:<2.0}C{v}{:>4.0}", temp.value, co2.value);
-            let temp_style = MonoTextStyle::new(&FONT_4X6, self.matrix_color());
-            let style = TextStyleBuilder::new()
-                .alignment(Alignment::Right)
-                .baseline(Baseline::Top)
-                .build();
+        // Points are in raster order, relative to the _lower_ box (not the absolute canvas)!
+        // Lower bounds:
+        let y_max = aux.bounding_box().bottom_right().unwrap().y;
 
-            Text::with_text_style(&s, Point::new(31, 0), temp_style, style)
-                .draw(aux)
-                .expect("infallible");
+        // Bottom line of each character is blank, we can skip it
+        let text_origin = Point::new(31, y_max + 1);
+        Text::with_text_style(&s, text_origin, temp_style, style)
+            .draw(aux)
+            .expect("infallible");
 
-            true
-        } else {
-            false
+        // The font is 4x6 but is really only 5 tall (one space line); match that.
+        let humid_level = f32::floor(humid.value / 80.0 * 5.0).clamp(0.0, 5.0) as i32;
+
+        // We can't actually draw a zero-dimensioned box; embedded_graphics uses inclusive bounds.
+        // That's fine.
+        if humid_level == 0 {
+            return true;
         }
+
+        let lower_left = Point {
+            x: 3 * 4 + 1,
+            y: y_max,
+        };
+        let upper_right = lower_left
+            + Point {
+                x: 3,
+                y: 1 - humid_level,
+            };
+        Rectangle::with_corners(lower_left, upper_right)
+            .draw_styled(
+                &PrimitiveStyleBuilder::new()
+                    .fill_color(self.matrix_color())
+                    .stroke_width(0)
+                    .build(),
+                aux,
+            )
+            .expect("infallible");
+
+        true
     }
 }
 

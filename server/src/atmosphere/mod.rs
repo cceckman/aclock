@@ -38,14 +38,27 @@ pub struct LastMeasurement {
 }
 
 impl LastMeasurement {
-    pub fn update(old: &mut Option<LastMeasurement>, time: DateTime<Utc>, new: Option<f32>) {
+    /// Apply an update, returning if the value was updated.
+    pub fn update(
+        store: &mut Option<LastMeasurement>,
+        time: DateTime<Utc>,
+        new: Option<f32>,
+    ) -> bool {
         let new = new.map(|value| LastMeasurement { at: time, value });
-        *old = match (*old, new) {
-            (Some(o), Some(new)) => Some(if new.at > o.at { new } else { o }),
-            (Some(o), None) => Some(o),
-            (None, Some(new)) => Some(new),
-            _ => None,
-        }
+        let (next, updated) = match (*store, new) {
+            (Some(old), Some(new)) => {
+                if new.at > old.at {
+                    (Some(new), true)
+                } else {
+                    (Some(old), false)
+                }
+            }
+            (Some(o), None) => (Some(o), false),
+            (None, Some(new)) => (Some(new), true),
+            _ => (None, false),
+        };
+        let _ = std::mem::replace(store, next);
+        updated
     }
 }
 
